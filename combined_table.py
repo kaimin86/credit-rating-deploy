@@ -443,7 +443,7 @@ LS_gridOptions["getRowStyle"] = JsCode("""
 """)
 
 st.subheader("✅ Final table going into AgGrid:")
-st.dataframe(short_table_df[["short_name", "Raw Score", "Adjustment", "Adjusted Score", "Analyst Comment"]])
+st.dataframe(short_table_df[["short_name", "Adjustment", "Analyst Comment"]])
 
 ## Render the table using AgGrid (and pass in your overrides injecting the CSS injection)
 
