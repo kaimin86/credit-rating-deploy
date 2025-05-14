@@ -13,7 +13,7 @@ fiscalperf_factor,0.0,
 govdebt_factor,0.0,
 ,0.0,
 extperf_factor,-0.5,limited spill overs from mining boom
-reservebuffer_factor,0.0,
+reservebuffer_factor,-2.0,
 reservestatus_factor,0.0,
 ,0.0,
 predicted_rating,-1.5,AAA
