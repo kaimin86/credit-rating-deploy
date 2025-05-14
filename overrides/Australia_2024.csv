@@ -6,7 +6,7 @@ size_factor,0.0,
 growth_factor,0.0,
 ,0.0,
 inflation_factor,0.0,
-default_factor,-2.0,
+default_factor,0.0,
 governance_factor,-1.0,weakening in institutions over past 5 years
 ,0.0,
 fiscalperf_factor,0.0,
@@ -16,5 +16,5 @@ extperf_factor,-0.5,limited spill overs from mining boom
 reservebuffer_factor,0.0,
 reservestatus_factor,0.0,
 ,0.0,
-predicted_rating,-1.5,AAA
-final_rating,0.0,AA
+predicted_rating,-3.5,AAA
+final_rating,0.0,A+
