@@ -1,0 +1,20 @@
+short_name,Adjustment,Analyst Comment
+const,0.0,
+,0.0,
+wealth_factor,0.0,
+size_factor,0.0,
+growth_factor,0.0,
+,0.0,
+inflation_factor,0.0,
+default_factor,0.0,
+governance_factor,-1.0,weakening in institutions over past 5 years
+,0.0,
+fiscalperf_factor,0.0,
+govdebt_factor,0.0,
+,0.0,
+extperf_factor,-0.5,limited spill overs from mining boom
+reservebuffer_factor,0.0,
+reservestatus_factor,0.0,
+,0.0,
+predicted_rating,0.0,AAA
+final_rating,0.0,AAA
