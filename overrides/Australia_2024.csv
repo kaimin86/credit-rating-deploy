@@ -16,5 +16,5 @@ extperf_factor,-0.5,limited spill overs from mining boom
 reservebuffer_factor,0.0,
 reservestatus_factor,0.0,
 ,0.0,
-predicted_rating,0.0,AAA
-final_rating,0.0,AAA
+predicted_rating,-1.5,AAA
+final_rating,0.0,AA
