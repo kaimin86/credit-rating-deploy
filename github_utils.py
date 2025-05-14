@@ -1,0 +1,140 @@
+# Goal of this function:
+# To download a CSV file from your GitHub repo, and load it into a pandas DataFrame — or return a blank DataFrame if the file doesn't exist.
+
+def load_df_from_github(repo, path, token):
+    import requests
+    from io import StringIO
+    import pandas as pd
+
+    url = f"https://raw.githubusercontent.com/{repo}/main/{path}"
+    headers = {"Authorization": f"token {token}"}
+
+    response = requests.get(url, headers=headers)
+    if response.status_code == 200:
+        return pd.read_csv(StringIO(response.text))
+    else:
+        return pd.DataFrame(columns=["short_name", "Adjustment", "Analyst Comment"])
+
+#This defines the function with 3 parameters:
+#repo: Your GitHub repo name, like "kaimin86/credit-rating-deploy"
+#path: The path to the CSV file inside your repo, e.g. "overrides/USA_2024.csv"
+#token: Your GitHub personal access token, used to authenticate
+
+#This function safely:
+#Downloads your override CSV from GitHub
+#Returns a usable DataFrame
+#Falls back to a blank frame if the file doesn’t exist yet
+
+#requests → makes the web request to GitHub
+#StringIO → treats text like a file (so pandas can read it)
+#pandas → to parse the CSV
+#Even though you're likely importing these at the top of the file too, having them here makes the function more self-contained
+
+#This builds the URL to the raw file on GitHub.
+#URL becomes: https://raw.githubusercontent.com/kaimin86/credit-rating-deploy/main/overrides/USA_2024.csv
+#This is a direct public URL to the raw file content.
+
+#This sets the header to include your GitHub token.
+#Even if your repo is public, this makes it more secure and avoids any rate limits from GitHub.
+
+#Makes a GET request to fetch the CSV file from GitHub.
+#If the file exists → you get a 200 response and file content
+#If the file doesn’t exist → you get a 404
+
+#Checks if the file was successfully found and loaded
+# If it exists, it:
+#Turns the text content into a file-like object (StringIO)
+#Loads it as a DataFrame with pd.read_csv(...)
+#Returns the resulting DataFrame
+
+#If the file does not exist (404 error), return an empty DataFrame with the right column structure — so the rest of your app won’t crash.
+
+# Goal of this function:
+# Uploads a pandas DataFrame to a GitHub repository as a CSV file.
+# If the file already exists, it will be updated (overwrite).
+
+#Parameters:
+#df: The DataFrame to upload
+#repo: GitHub repo in the format 'username/repo-name'
+#path: Path to save the file in the repo, e.g., 'overrides/USA_2024.csv'
+#commit_message: The commit message to show in GitHub
+#token: GitHub personal access token (ideally from st.secrets)
+
+#Returns:
+#True if successful, False otherwise
+
+def push_df_to_github(df, repo, path, commit_message, token):
+    import base64
+    import requests
+
+    url = f"https://api.github.com/repos/{repo}/contents/{path}"
+    csv_string = df.to_csv(index=False)
+    encoded_content = base64.b64encode(csv_string.encode()).decode()
+
+    headers = {
+        "Authorization": f"token {token}",
+        "Accept": "application/vnd.github.v3+json"
+    }
+
+    response = requests.get(url, headers=headers)
+    sha = response.json().get("sha") if response.status_code == 200 else None
+
+    data = {
+        "message": commit_message,
+        "content": encoded_content,
+        "branch": "main"
+    }
+    if sha:
+        data["sha"] = sha
+
+    put_response = requests.put(url, headers=headers, json=data)
+
+    if put_response.status_code in (200, 201):
+        return True
+    else:
+        print("Error pushing to GitHub:", put_response.json())
+        return False
+
+
+#Build the API URL for the file.
+#If you’re saving to kaimin86/credit-rating-deploy, and path = overrides/USA_2024.csv,
+#then this URL becomes: https://api.github.com/repos/kaimin86/credit-rating-deploy/contents/overrides/USA_2024.csv
+
+#Convert the DataFrame into CSV format (as a plain text string).
+#index=False omits the row numbers.
+
+#GitHub's API requires file contents to be base64-encoded.
+#Converts the string to bytes
+#Encodes the bytes in base64
+#Decodes it back to a string (to include in the JSON payload)
+
+#Build the request headers:
+#Authorization: your GitHub token to prove you have write access
+#Accept: tells GitHub which version of their API you want
+
+#Try to fetch the file in case it already exists.
+#Why? Because GitHub needs the file’s SHA if you're updating it.
+
+#If the file exists, grab its SHA.
+#You need this to tell GitHub: "I want to overwrite this exact file."
+#If the file doesn’t exist yet (e.g., first save), sha will be None.
+
+#Build the JSON payload to send to GitHub:
+#"message": commit message (appears in repo history)
+#"content": your CSV, in base64 format
+#"branch": which branch to push to (usually "main")
+
+#If you're overwriting an existing file, include its SHA.
+#GitHub requires this to avoid accidental overwrites or conflicts.
+
+#Send a PUT request to GitHub with the payload.
+#This either: Creates the file (if it didn’t exist) or Overwrites it (if it did)
+
+#Return True if:
+#201: file was created
+#200: file was updated
+#Otherwise, return False.
+
+
+
+## ASK where to save and call the token. thanks!

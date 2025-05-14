@@ -6,6 +6,7 @@ from io import BytesIO
 from openpyxl import Workbook
 from openpyxl.styles import PatternFill, Font, Alignment, Border, Side
 from openpyxl.utils import get_column_letter
+from github_utils import load_df_from_github, push_df_to_github 
 
 # Page setup. (must be your very first Streamlit call)
 
@@ -194,11 +195,9 @@ short_table_df = short_table_df.rename(columns={'long_name': 'Factor'})
 ## Load Overrides Based on Country-Year
 
 override_path = f"overrides/{selected_name}_{selected_year}.csv"
-
-try:
-    override_df = pd.read_csv(override_path) #checks to see if this file exists in my overrides folder
-except FileNotFoundError: #if not normally crashes. except tells python to ignore "FileNotFoundError"
-    override_df = pd.DataFrame(columns=["short_name", "Adjustment", "Analyst Comment"]) #and instead create this blank df
+github_repo = "kaimin86/credit-rating-deploy"
+github_token = st.secrets["github_token"]
+override_df = load_df_from_github(github_repo, override_path, github_token)
 
 ## Merge overrides into the main df
 short_table_df = pd.merge(short_table_df, override_df, on="short_name", how="left")
@@ -644,12 +643,21 @@ excel_data = generate_custom_export(export_short_df)
 save_col_short, export_col_short, blank_col_short = st.columns([2, 2, 6])
 
 with save_col_short:
-    if st.button("💾 Save Analyst Overrides",key="short_save"):
-        # Save only the override columns (factor-level edits) to a file
+    if st.button("💾 Save Analyst Overrides", key="short_save"):
         columns_to_save = ["short_name", "Adjustment", "Analyst Comment"]
-        updated_df[columns_to_save].to_csv(override_path, index=False)
-        st.success("✅ Overrides saved and rating updated.")
-        st.rerun() #rerun entire script from top to bottom so analyst can see update immediately
+        override_df_to_save = updated_df[columns_to_save]
+        
+        success = push_df_to_github(df=override_df_to_save,
+                                    repo="kaimin86/credit-rating-deploy",
+                                    path=override_path,
+                                    commit_message=f"Save override for {selected_name} {selected_year}",
+                                    token=st.secrets["github_token"])
+        
+        if success:
+            st.success("✅ Overrides saved and rating updated.")
+            st.rerun()
+        else:
+            st.error("❌ Failed to save overrides.")
 
 with export_col_short:
     st.download_button(
