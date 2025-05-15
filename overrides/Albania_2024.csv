@@ -12,9 +12,9 @@ governance_factor,0.0,
 fiscalperf_factor,1.0,strong
 govdebt_factor,1.0,man tactics
 ,0.0,
-extperf_factor,0.0,
-reservebuffer_factor,0.0,
+extperf_factor,1.0,albania tanzania
+reservebuffer_factor,2.0,show me the money
 reservestatus_factor,0.0,
 ,0.0,
-predicted_rating,0.0,BB
-final_rating,0.0,BB
+predicted_rating,2.0,BB
+final_rating,0.0,BBB-
