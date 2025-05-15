@@ -659,7 +659,7 @@ with save_col_short:
         
         if success:
             st.success("✅ Overrides saved and rating updated.")
-            time.sleep(1.5)
+            time.sleep(3.0)
             st.rerun()
         else:
             st.error("❌ Failed to save overrides.")
