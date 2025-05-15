@@ -6,7 +6,7 @@ from io import BytesIO
 from openpyxl import Workbook
 from openpyxl.styles import PatternFill, Font, Alignment, Border, Side
 from openpyxl.utils import get_column_letter
-from github_utils import load_df_from_github, push_df_to_github
+from github_utils import load_df_from_github, push_df_to_github, wait_for_override_to_update
 import time 
 
 # Page setup. (must be your very first Streamlit call)
@@ -650,19 +650,39 @@ with save_col_short:
     if st.button("💾 Save Analyst Overrides", key="short_save"):
         columns_to_save = ["short_name", "Adjustment", "Analyst Comment"]
         override_df_to_save = updated_df[columns_to_save]
-        
-        success = push_df_to_github(df=override_df_to_save,
-                                    repo="kaimin86/credit-rating-deploy",
-                                    path=override_path,
-                                    commit_message=f"Save override for {selected_name} {selected_year}",
-                                    token=st.secrets["github_token"])
-        
+
+        # Capture current version before pushing
+        df_before = load_df_from_github(
+            repo="kaimin86/credit-rating-deploy",
+            path=override_path,
+            token=st.secrets["github_token"]
+        )
+
+        # Push updated file to GitHub
+        success = push_df_to_github(
+            df=override_df_to_save,
+            repo="kaimin86/credit-rating-deploy",
+            path=override_path,
+            commit_message=f"Save override for {selected_name} {selected_year}",
+            token=st.secrets["github_token"]
+        )
+
         if success:
-            st.success("✅ Overrides saved and rating updated.")
-            time.sleep(3.0)
-            st.rerun()
+            with st.spinner("⏳ Waiting for GitHub to reflect updated file..."):
+                updated = wait_for_override_to_update(
+                    repo="kaimin86/credit-rating-deploy",
+                    path=override_path,
+                    token=st.secrets["github_token"],
+                    df_before=df_before
+                )
+
+            if updated:
+                st.success("✅ GitHub file updated. Reloading app...")
+                st.rerun()
+            else:
+                st.warning("⚠️ GitHub file saved, but not yet visible. Please refresh manually.")
         else:
-            st.error("❌ Failed to save overrides.")
+            st.error("❌ Failed to save override to GitHub.")
 
 with export_col_short:
     st.download_button(
