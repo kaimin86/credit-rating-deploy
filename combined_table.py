@@ -6,7 +6,8 @@ from io import BytesIO
 from openpyxl import Workbook
 from openpyxl.styles import PatternFill, Font, Alignment, Border, Side
 from openpyxl.utils import get_column_letter
-from github_utils import load_df_from_github, push_df_to_github 
+from github_utils import load_df_from_github, push_df_to_github
+import time 
 
 # Page setup. (must be your very first Streamlit call)
 
@@ -658,6 +659,7 @@ with save_col_short:
         
         if success:
             st.success("✅ Overrides saved and rating updated.")
+            time.sleep(1.5)
             st.rerun()
         else:
             st.error("❌ Failed to save overrides.")
