@@ -162,19 +162,25 @@ def push_df_to_github(df, repo, path, commit_message, token):
 # Helps my analyst see fresh updated data once they click save. else it was showing stale data
 
 def wait_for_override_to_update(repo, path, token, df_before, max_retries=10):
-    
     import time
     import pandas as pd
     
-    """
-    Polls GitHub until the override file visibly changes from its prior state.
-    Returns True if update detected, False if timed out.
-    """
+    def normalize_df(df):
+        df = df.copy()
+        df["Adjustment"] = pd.to_numeric(df["Adjustment"], errors="coerce").fillna(0)
+        df["Analyst Comment"] = df["Analyst Comment"].fillna("").astype(str)
+        df = df.sort_values(by="short_name").reset_index(drop=True)
+        return df
+
+    df_before_norm = normalize_df(df_before)
+
     for attempt in range(max_retries):
         time.sleep(1)
 
         df_after = load_df_from_github(repo, path, token)
-        if not df_after.equals(df_before):
-            return True  # Detected update
+        df_after_norm = normalize_df(df_after)
 
-    return False  # Timeout
+        if not df_after_norm.equals(df_before_norm):
+            return True
+
+    return False
