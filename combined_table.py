@@ -6,7 +6,7 @@ from io import BytesIO
 from openpyxl import Workbook
 from openpyxl.styles import PatternFill, Font, Alignment, Border, Side
 from openpyxl.utils import get_column_letter
-from github_utils import load_df_from_github, push_df_to_github, wait_for_override_to_update
+from github_utils import load_df_from_github, push_df_to_github, wait_for_override_to_update, wait_until_override_row_matches
 import time 
 
 # Page setup. (must be your very first Streamlit call)
@@ -648,39 +648,54 @@ save_col_short, export_col_short, blank_col_short = st.columns([2, 2, 6])
 
 with save_col_short:
     if st.button("💾 Save Analyst Overrides", key="short_save"):
+        start_total = time.time()
+
         columns_to_save = ["short_name", "Adjustment", "Analyst Comment"]
         override_df_to_save = updated_df[columns_to_save]
 
-        # Capture current version before pushing
+        # --- Load current version for baseline timing
+        st.info("📥 Loading current override before update...")
         df_before = load_df_from_github(
-            repo="kaimin86/credit-rating-deploy",
+            repo=github_repo,
             path=override_path,
-            token=st.secrets["github_token"]
+            token=github_token
         )
 
-        # Push updated file to GitHub
+        # --- Push override to GitHub
+        st.info("📤 Saving override to GitHub...")
+        push_start = time.time()
         success = push_df_to_github(
             df=override_df_to_save,
-            repo="kaimin86/credit-rating-deploy",
+            repo=github_repo,
             path=override_path,
             commit_message=f"Save override for {selected_name} {selected_year}",
-            token=st.secrets["github_token"]
+            token=github_token
         )
+        push_duration = time.time() - push_start
+        st.info(f"✅ GitHub push completed in {push_duration:.2f} seconds.")
 
+        # --- If push successful, wait for confirmation
         if success:
-            with st.spinner("⏳ Waiting for GitHub to reflect updated file..."):
-                updated = wait_for_override_to_update(
-                    repo="kaimin86/credit-rating-deploy",
-                    path=override_path,
-                    token=st.secrets["github_token"],
-                    df_before=df_before
-                )
+            # Extract first override row to track (test with one row)
+            target_row = override_df_to_save.iloc[2].to_dict()
+
+            st.info("⏳ Waiting for GitHub to reflect updated override...")
+            wait_start = time.time()
+            updated = wait_until_override_row_matches(
+                repo=github_repo,
+                path=override_path,
+                token=github_token,
+                target_row=target_row
+            )
+            wait_duration = time.time() - wait_start
 
             if updated:
-                st.success("✅ GitHub file updated. Reloading app...")
+                total_time = time.time() - start_total
+                st.success(f"✅ Override confirmed after {wait_duration:.2f}s (total: {total_time:.2f}s). Reloading...")
                 st.rerun()
             else:
-                st.warning("⚠️ GitHub file saved, but not yet visible. Please refresh manually.")
+                st.warning("⚠️ GitHub override saved, but value not yet visible. Try manual refresh.")
+                st.experimental_rerun()
         else:
             st.error("❌ Failed to save override to GitHub.")
 
