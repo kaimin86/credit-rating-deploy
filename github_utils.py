@@ -184,3 +184,44 @@ def wait_for_override_to_update(repo, path, token, df_before, max_retries=10):
             return True
 
     return False
+
+
+def wait_until_override_row_matches(repo, path, token, target_row, max_retries=10, delay=1):
+    import time
+    import pandas as pd
+    """
+    Polls GitHub until a specific row in the override file matches expected values.
+    Only triggers rerun when exact override appears.
+
+    Parameters:
+    - repo: GitHub repo string (e.g. "kaimin86/credit-rating-deploy")
+    - path: path to the override file (e.g. "overrides/USA_2024.csv")
+    - token: GitHub token from st.secrets
+    - target_row: dict with expected override (e.g. {"short_name": "GDP", "Adjustment": -0.2, "Analyst Comment": "Revised"})
+    - max_retries: number of times to retry
+    - delay: seconds to wait between retries
+
+    Returns:
+    - True if update detected
+    - False if timeout
+    """
+    from .github_utils import load_df_from_github  # remove the dot if inside same file
+
+    for attempt in range(max_retries):
+        time.sleep(delay)
+        df = load_df_from_github(repo, path, token)
+
+        # Normalize for safe comparison
+        df["Adjustment"] = pd.to_numeric(df["Adjustment"], errors="coerce").fillna(0)
+        df["Analyst Comment"] = df["Analyst Comment"].fillna("").astype(str)
+
+        match = df[
+            (df["short_name"] == target_row["short_name"]) &
+            (df["Adjustment"].round(4) == round(target_row["Adjustment"], 4)) &
+            (df["Analyst Comment"].str.strip() == target_row["Analyst Comment"].strip())
+        ]
+
+        if not match.empty:
+            return True
+
+    return False
