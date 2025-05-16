@@ -1,7 +1,7 @@
 short_name,Adjustment,Analyst Comment
 const,0.0,
 ,0.0,
-wealth_factor,10.0,greed is good
+wealth_factor,2.0,bronze statue
 size_factor,0.0,
 growth_factor,0.0,
 ,0.0,
@@ -16,5 +16,5 @@ extperf_factor,1.0,albania tanzania
 reservebuffer_factor,2.0,show me the money
 reservestatus_factor,-5.0,getting out of the eur
 ,0.0,
-predicted_rating,8.0,BB
-final_rating,0.0,AA-
+predicted_rating,10.0,BB
+final_rating,0.0,AA+
