@@ -695,7 +695,7 @@ with save_col_short:
                 st.rerun()
             else:
                 st.warning("⚠️ GitHub override saved, but value not yet visible. Try manual refresh.")
-                st.experimental_rerun()
+                st.rerun()
         else:
             st.error("❌ Failed to save override to GitHub.")
 
