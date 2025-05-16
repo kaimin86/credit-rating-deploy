@@ -205,7 +205,7 @@ def wait_until_override_row_matches(repo, path, token, target_row, max_retries=1
     - True if update detected
     - False if timeout
     """
-    from .github_utils import load_df_from_github  # remove the dot if inside same file
+    from github_utils import load_df_from_github  # remove the dot if inside same file
 
     for attempt in range(max_retries):
         time.sleep(delay)
