@@ -4,4 +4,4 @@ streamlit-aggrid
 openpyxl
 requests
 gspread
-oauth2client
+google-auth

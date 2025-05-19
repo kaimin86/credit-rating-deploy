@@ -8,7 +8,7 @@ from openpyxl.styles import PatternFill, Font, Alignment, Border, Side
 from openpyxl.utils import get_column_letter
 import json
 import gspread
-from oauth2client.service_account import ServiceAccountCredentials
+from google.oauth2.service_account import Credentials
 from gsheets_utils import load_override_from_gsheet, save_override_to_gsheet
 
 
@@ -205,11 +205,11 @@ scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/au
 #Allows access to read/write Google Sheets data
 #Allows access to open the sheet (via Google Drive), even if it's not explicitly listed in your Drive UI
 #These are required for gspread to function correctly.
-creds_dict = dict(st.secrets["gcp_service_account"]) #--> config object st.secrets. need to convert to a DICT
-creds_dict["private_key"] = creds_dict["private_key"].replace("\\n", "\n") # Repair the escaped-newline issue:
+creds_info = dict(st.secrets["gcp_service_account"]) #--> config object st.secrets. need to convert to a DICT
+creds_info["private_key"] = creds_info["private_key"].replace("\\n", "\n") # Repair the escaped-newline issue
 #Pulls your service account credentials from Streamlit’s secrets.toml file, where you’ve stored the [gcp_service_account] block.
 #creds_dict is now a Python dictionary containing your private key, client email, etc.
-creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
+creds = Credentials.from_service_account_info(creds_info, scope)
 #Converts the credentials dictionary into a usable OAuth2 credentials object that gspread can use to authenticate
 #Think of it as logging in with the service account and telling Google what scopes (permissions) your app wants.
 client = gspread.authorize(creds)
