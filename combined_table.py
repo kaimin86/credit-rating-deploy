@@ -205,7 +205,7 @@ scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/au
 #Allows access to read/write Google Sheets data
 #Allows access to open the sheet (via Google Drive), even if it's not explicitly listed in your Drive UI
 #These are required for gspread to function correctly.
-creds_dict = st.secrets["gcp_service_account"]
+creds_dict = dict(st.secrets["gcp_service_account"]) #--> config object st.secrets. need to convert to a DICT
 #Pulls your service account credentials from Streamlit’s secrets.toml file, where you’ve stored the [gcp_service_account] block.
 #creds_dict is now a Python dictionary containing your private key, client email, etc.
 creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
