@@ -209,7 +209,7 @@ creds_info = dict(st.secrets["gcp_service_account"]) #--> config object st.secre
 creds_info["private_key"] = creds_info["private_key"].replace("\\n", "\n") # Repair the escaped-newline issue
 #Pulls your service account credentials from Streamlit’s secrets.toml file, where you’ve stored the [gcp_service_account] block.
 #creds_dict is now a Python dictionary containing your private key, client email, etc.
-creds = Credentials.from_service_account_info(creds_info, scope)
+creds = Credentials.from_service_account_info(creds_info, scopes = scope) #important to put scopes = " ". otherwise position wrong
 #Converts the credentials dictionary into a usable OAuth2 credentials object that gspread can use to authenticate
 #Think of it as logging in with the service account and telling Google what scopes (permissions) your app wants.
 client = gspread.authorize(creds)
