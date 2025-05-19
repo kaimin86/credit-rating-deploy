@@ -6,8 +6,11 @@ from io import BytesIO
 from openpyxl import Workbook
 from openpyxl.styles import PatternFill, Font, Alignment, Border, Side
 from openpyxl.utils import get_column_letter
-from github_utils import load_df_from_github, push_df_to_github, wait_for_override_to_update, wait_until_override_row_matches
-import time 
+import json
+import gspread
+from oauth2client.service_account import ServiceAccountCredentials
+from gsheets_utils import load_override_from_gsheet, save_override_to_gsheet
+
 
 # Page setup. (must be your very first Streamlit call)
 
@@ -195,10 +198,35 @@ short_table_df = short_table_df.rename(columns={'long_name': 'Factor'})
 
 ## Load Overrides Based on Country-Year
 
-override_path = f"overrides/{selected_name}_{selected_year}.csv"
-github_repo = "kaimin86/credit-rating-deploy"
-github_token = st.secrets["github_token"]
-override_df = load_df_from_github(github_repo, override_path, github_token)
+## To do this we need to set up to connect to google sheets
+
+scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
+#Defines the authorization scopes — i.e., what permissions your app is requesting from Google. 
+#Allows access to read/write Google Sheets data
+#Allows access to open the sheet (via Google Drive), even if it's not explicitly listed in your Drive UI
+#These are required for gspread to function correctly.
+creds_dict = st.secrets["gcp_service_account"]
+#Pulls your service account credentials from Streamlit’s secrets.toml file, where you’ve stored the [gcp_service_account] block.
+#creds_dict is now a Python dictionary containing your private key, client email, etc.
+creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
+#Converts the credentials dictionary into a usable OAuth2 credentials object that gspread can use to authenticate
+#Think of it as logging in with the service account and telling Google what scopes (permissions) your app wants.
+client = gspread.authorize(creds)
+#Uses the credentials to create a gspread client — this is your authenticated connection to Google Sheets
+#You’ll use client to open any sheet, read, write, or update data.
+sheet_short = client.open("analyst_overrides_short")
+#Opens the Google Sheet named "analyst_overrides_short"
+#Note that streamlit "sees" this as the entire spreadsheet since we didn't specify specific tab
+#Now sheet_short is a live object that lets you read from or write to that google sheet
+
+## With the connection established. Let us load the analyst overrides into our short_table_df
+override_df = load_override_from_gsheet(sheet_short, selected_name, selected_year)
+#what this function does is looks at the google sheet object (sheet_short in this case)
+#uses selected_name to find the relevant country tab (cos i named each tab with a different country name)
+#within the country tab, searches for overrides in a specific year (selected_year) "short_name", "Adjustment", "Analyst Comment"
+#calls this out as a df called override_df
+
+## Loading block complete ##
 
 ## Merge overrides into the main df
 short_table_df = pd.merge(short_table_df, override_df, on="short_name", how="left")
@@ -443,9 +471,6 @@ LS_gridOptions["getRowStyle"] = JsCode("""
   }
 """)
 
-st.subheader("✅ Final table going into AgGrid:")
-st.dataframe(short_table_df[["short_name", "Adjustment", "Analyst Comment"]])
-
 ## Render the table using AgGrid (and pass in your overrides injecting the CSS injection)
 
 grid_response = AgGrid(
@@ -647,57 +672,16 @@ excel_data = generate_custom_export(export_short_df)
 save_col_short, export_col_short, blank_col_short = st.columns([2, 2, 6])
 
 with save_col_short:
-    if st.button("💾 Save Analyst Overrides", key="short_save"):
-        start_total = time.time()
-
+    if st.button("💾 Save Analyst Overrides",key="short_save"):
+        # Save only the override columns (factor-level edits) to a file
         columns_to_save = ["short_name", "Adjustment", "Analyst Comment"]
-        override_df_to_save = updated_df[columns_to_save]
-
-        # --- Load current version for baseline timing
-        st.info("📥 Loading current override before update...")
-        df_before = load_df_from_github(
-            repo=github_repo,
-            path=override_path,
-            token=github_token
-        )
-
-        # --- Push override to GitHub
-        st.info("📤 Saving override to GitHub...")
-        push_start = time.time()
-        success = push_df_to_github(
-            df=override_df_to_save,
-            repo=github_repo,
-            path=override_path,
-            commit_message=f"Save override for {selected_name} {selected_year}",
-            token=github_token
-        )
-        push_duration = time.time() - push_start
-        st.info(f"✅ GitHub push completed in {push_duration:.2f} seconds.")
-
-        # --- If push successful, wait for confirmation
-        if success:
-            # Extract first override row to track (test with one row)
-            target_row = override_df_to_save.iloc[2].to_dict()
-
-            st.info("⏳ Waiting for GitHub to reflect updated override...")
-            wait_start = time.time()
-            updated = wait_until_override_row_matches(
-                repo=github_repo,
-                path=override_path,
-                token=github_token,
-                target_row=target_row
-            )
-            wait_duration = time.time() - wait_start
-
-            if updated:
-                total_time = time.time() - start_total
-                st.success(f"✅ Override confirmed after {wait_duration:.2f}s (total: {total_time:.2f}s). Reloading...")
-                st.rerun()
-            else:
-                st.warning("⚠️ GitHub override saved, but value not yet visible. Try manual refresh.")
-                st.rerun()
-        else:
-            st.error("❌ Failed to save override to GitHub.")
+        updated_subset = updated_df[columns_to_save]
+        
+        # Use the full Google Sheet, then pass selected_name to target the right tab
+        save_override_to_gsheet(sheet_short, updated_subset, selected_name, selected_year)
+        
+        st.success("✅ Overrides saved and rating updated.")
+        st.rerun() #rerun entire script from top to bottom so analyst can see update immediately
 
 with export_col_short:
     st.download_button(
