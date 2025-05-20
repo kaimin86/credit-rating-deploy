@@ -1050,11 +1050,19 @@ function(params) {
 factor_style_long = JsCode("""
 function(params) {
   const style = {};
-  // 1) Shade every non-header row
-  if (params.data.short_name !== '') {
+  // header sentinels to skip
+  const headers = [
+    "eco_header",
+    "insti_header",
+    "fiscal_header",
+    "ext_header",
+    "final_header"
+  ];
+  // Shade every non-header row
+  if (!headers.includes(params.data.short_name)) {
     style['background-color'] = '#DAEEF3';
   }
-  // 2) Bold all Factor text
+  // Bold all text
   style['font-weight'] = 'bold';
   return style;
 }
