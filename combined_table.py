@@ -135,7 +135,7 @@ short_table_df = pd.concat([short_table_df, total_row], ignore_index=True)
 
 ## Build section header rows
 economy_pillar = pd.DataFrame([{
-    'short_name': '',
+    'short_name': 'eco_header',
     'long_name': 'REAL ECONOMY PILLAR (25%)',
     'coefficient': '',
     'Z-score Value': '',
@@ -143,7 +143,7 @@ economy_pillar = pd.DataFrame([{
 }])
 
 institutions_pillar = pd.DataFrame([{
-    'short_name': '',
+    'short_name': 'insti_header',
     'long_name': 'MONETARY & INSTITUTIONS PILLAR (44%)',
     'coefficient': '',
     'Z-score Value': '',
@@ -151,7 +151,7 @@ institutions_pillar = pd.DataFrame([{
 }])
 
 fiscal_pillar = pd.DataFrame([{
-    'short_name': '',
+    'short_name': 'fiscal_header',
     'long_name': 'FISCAL PILLAR (17%)',
     'coefficient': '',
     'Z-score Value': '',
@@ -159,7 +159,7 @@ fiscal_pillar = pd.DataFrame([{
 }])
 
 external_pillar = pd.DataFrame([{
-    'short_name': '',
+    'short_name': 'ext_header',
     'long_name': 'EXTERNAL PILLAR (14%)',
     'coefficient': '',
     'Z-score Value': '',
@@ -167,7 +167,7 @@ external_pillar = pd.DataFrame([{
 }])
 
 final_pillar = pd.DataFrame([{
-    'short_name': '',
+    'short_name': 'final_header',
     'long_name': 'SOVEREIGN CREDIT RATING',
     'coefficient': '',
     'Z-score Value': '',
@@ -740,7 +740,7 @@ long_table_df = pd.merge(long_table_df, long_table_df_transform, on = 'short_nam
 
 ## Build section header rows
 economy_pillar = pd.DataFrame([{
-    'short_name': '',
+    'short_name': 'eco_header',
     'long_name': 'REAL ECONOMY PILLAR (25%)',
     'description': '',
     'Raw Value': '',
@@ -748,7 +748,7 @@ economy_pillar = pd.DataFrame([{
 }])
 
 institutions_pillar = pd.DataFrame([{
-    'short_name': '',
+    'short_name': 'insti_header',
     'long_name': 'MONETARY & INSTITUTIONS PILLAR (44%)',
     'description': '',
     'Raw Value': '',
@@ -756,7 +756,7 @@ institutions_pillar = pd.DataFrame([{
 }])
 
 fiscal_pillar = pd.DataFrame([{
-    'short_name': '',
+    'short_name': 'fiscal_header',
     'long_name': 'FISCAL PILLAR (17%)',
     'description': '',
     'Raw Value': '',
@@ -764,7 +764,7 @@ fiscal_pillar = pd.DataFrame([{
 }])
 
 external_pillar = pd.DataFrame([{
-    'short_name': '',
+    'short_name': 'ext_header',
     'long_name': 'EXTERNAL PILLAR (14%)',
     'description': '',
     'Raw Value': '',
