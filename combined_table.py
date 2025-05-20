@@ -11,7 +11,6 @@ import gspread
 from google.oauth2.service_account import Credentials
 from gsheets_utils import load_override_from_gsheet, save_override_to_gsheet
 
-
 # Page setup. (must be your very first Streamlit call)
 
 st.set_page_config(
@@ -192,7 +191,6 @@ short_table_df = pd.concat(
 # Change column names to make more presentable
 
 short_table_df = short_table_df.rename(columns={'long_name': 'Factor'})
-
 
 # Inserting override logic to allow user interaction. HARDEST PART!!
 
@@ -499,7 +497,6 @@ grid_response = AgGrid(
 updated_df = grid_response["data"] #extracts the updated DataFrame after user edits from AgGrid (adjustment and comments col)
 updated_df["Adjustment"] = pd.to_numeric(updated_df["Adjustment"], errors="coerce").fillna(0) #safety layer to ensure only numeric captured
 #errors = coerce means you dont crash the app if non numeric. just input nan value. which we then turn to zero!
-
 
 # Create formatted excel file for export
 export_short_df = updated_df.drop(columns=['short_name'])
