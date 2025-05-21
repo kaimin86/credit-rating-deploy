@@ -788,14 +788,15 @@ long_table_df = long_table_df.rename(columns={'long_name':'Factor','description'
 
 # Inserting override logic to allow user interaction. HARDEST PART!!
 
-## Load Overrides Based on Country-Year
+#already ran the authorization block of code to google sheets above. now we just use client object to open a new sheet
+sheet_long = client.open("analyst_overrides_long")
 
-override_path_long = f"overrides/{selected_name}_{selected_year}_long.csv"
-
-try:
-    override_df_long = pd.read_csv(override_path_long) #checks to see if this file exists in my overrides folder
-except FileNotFoundError: #if not normally crashes. except tells python to ignore "FileNotFoundError"
-    override_df_long = pd.DataFrame(columns=["short_name", "Adjustment", "Analyst Comment"]) #and instead create this blank df
+## With the connection established. Let us load the analyst overrides into our long_table_df
+override_df_long = load_override_from_gsheet(sheet_long, selected_name, selected_year)
+#what this function does is looks at the google sheet object (sheet_long in this case)
+#uses selected_name to find the relevant country tab (cos i named each tab with a different country name)
+#within the country tab, searches for overrides in a specific year (selected_year) "short_name", "Adjustment", "Analyst Comment"
+#calls this out as a df called override_df_long
 
 ## Merge overrides into the main df
 long_table_df = pd.merge(long_table_df, override_df_long, on="short_name", how="left")
@@ -1349,7 +1350,6 @@ def generate_custom_export_long(
 
 excel_data_long = generate_custom_export_long(export_long_df)
 
-
 # Put the Save + Export buttons side by side
 # carve the page into 3 chunks: 
 #  • 1 unit for btn1 
@@ -1362,7 +1362,11 @@ with save_col_long:
     if st.button("💾 Save Analyst Overrides",key="long_save"):
         # Save only the override columns (factor-level edits) to a file
         columns_to_save_long = ["short_name", "Adjustment", "Analyst Comment"]
-        updated_df_long[columns_to_save_long].to_csv(override_path_long, index=False)
+        updated_subset_long = updated_df_long[columns_to_save_long]
+
+        # Use the full Google Sheet, then pass selected_name to target the right tab
+        save_override_to_gsheet(sheet_long, updated_subset_long, selected_name, selected_year)
+
         st.success("✅ Overrides saved and rating updated.")
         st.rerun() #rerun entire script from top to bottom so analyst can see update immediately
 

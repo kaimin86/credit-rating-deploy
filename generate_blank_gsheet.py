@@ -18,7 +18,7 @@ client = gspread.authorize(creds)
 country_list = pd.read_excel("index_country.xlsx")["name"].dropna().unique().tolist()
 
 # --- Open your master sheet (must be created manually and shared first) ---
-sheet = client.open("analyst_overrides_short")
+sheet = client.open("analyst_overrides_long")
 
 # --- Create tabs for each country ---
 
