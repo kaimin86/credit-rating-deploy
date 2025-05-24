@@ -22,13 +22,26 @@ st.set_page_config(
 st.title("LS Sovereign Credit Rating Model")
 
 # Load data
-df_transform = pd.read_excel("transform_data.xlsx")
-df_raw = pd.read_excel("raw_data.xlsx")
-coeff_index = pd.read_excel("coefficients_apr2024.xlsx")
-rating_index = pd.read_excel("index_rating_scale.xlsx")
-variable_index = pd.read_excel("index_variable_name.xlsx")
-country_index = pd.read_excel("index_country.xlsx")
-public_rating_index = pd.read_excel("index_bbg_rating_live.xlsx", sheet_name = "hard_code")
+# Caches the data so that it only loads once for the users. since the dfs don't change much.
+# this reduces the loading time
+
+#if st.button("🔄 Refresh data from source"): #--> to use in future if i run the paid version!
+    #st.cache_data.clear()        # clear ALL @st.cache_data caches
+    #st.rerun()      # immediately rerun the script
+
+@st.cache_data
+def load_all_excels():
+    return (
+        pd.read_excel("transform_data.xlsx"),
+        pd.read_excel("raw_data.xlsx"),
+        pd.read_excel("coefficients_apr2024.xlsx"),
+        pd.read_excel("index_rating_scale.xlsx"),
+        pd.read_excel("index_variable_name.xlsx"),
+        pd.read_excel("index_country.xlsx"),
+        pd.read_excel("index_bbg_rating_live.xlsx", sheet_name="hard_code"),
+    )
+df_transform, df_raw, coeff_index, rating_index, variable_index, country_index, public_rating_index = load_all_excels()
+
 
 #Inject the width-limiting CSS before your selectbox calls
 #else they appeared to be too wide!
@@ -198,32 +211,61 @@ short_table_df = short_table_df.rename(columns={'long_name': 'Factor'})
 
 ## To do this we need to set up to connect to google sheets
 
-scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
+@st.cache_resource
+def init_gsheets_client():
+    scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
+    creds_info = dict(st.secrets["gcp_service_account"])
+    creds_info["private_key"] = creds_info["private_key"].replace("\\n", "\n")
+    creds = Credentials.from_service_account_info(creds_info, scopes=scope)
+    return gspread.authorize(creds)
+
+client = init_gsheets_client()
+
+## (the below segment is the old code along with explainers...)
+
+## scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
 #Defines the authorization scopes — i.e., what permissions your app is requesting from Google. 
 #Allows access to read/write Google Sheets data
 #Allows access to open the sheet (via Google Drive), even if it's not explicitly listed in your Drive UI
 #These are required for gspread to function correctly.
-creds_info = dict(st.secrets["gcp_service_account"]) #--> config object st.secrets. need to convert to a DICT
-creds_info["private_key"] = creds_info["private_key"].replace("\\n", "\n") # Repair the escaped-newline issue
+
+## creds_info = dict(st.secrets["gcp_service_account"]) #--> config object st.secrets. need to convert to a DICT
+
+## creds_info["private_key"] = creds_info["private_key"].replace("\\n", "\n") # Repair the escaped-newline issue
+
 #Pulls your service account credentials from Streamlit’s secrets.toml file, where you’ve stored the [gcp_service_account] block.
+
 #creds_dict is now a Python dictionary containing your private key, client email, etc.
-creds = Credentials.from_service_account_info(creds_info, scopes = scope) #important to put scopes = " ". otherwise position wrong
+
+##creds = Credentials.from_service_account_info(creds_info, scopes = scope) #important to put scopes = " ". otherwise position wrong
+
 #Converts the credentials dictionary into a usable OAuth2 credentials object that gspread can use to authenticate
 #Think of it as logging in with the service account and telling Google what scopes (permissions) your app wants.
-client = gspread.authorize(creds)
+
+## client = gspread.authorize(creds)
 #Uses the credentials to create a gspread client — this is your authenticated connection to Google Sheets
 #You’ll use client to open any sheet, read, write, or update data.
-sheet_short = client.open("analyst_overrides_short")
+
+## sheet_short = client.open("analyst_overrides_short")
 #Opens the Google Sheet named "analyst_overrides_short"
 #Note that streamlit "sees" this as the entire spreadsheet since we didn't specify specific tab
 #Now sheet_short is a live object that lets you read from or write to that google sheet
 
-## With the connection established. Let us load the analyst overrides into our short_table_df
-override_df = load_override_from_gsheet(sheet_short, selected_name, selected_year)
+#With the connection established. Let us load the analyst overrides into our short_table_df
+## override_df = load_override_from_gsheet(sheet_short, selected_name, selected_year)
 #what this function does is looks at the google sheet object (sheet_short in this case)
 #uses selected_name to find the relevant country tab (cos i named each tab with a different country name)
 #within the country tab, searches for overrides in a specific year (selected_year) "short_name", "Adjustment", "Analyst Comment"
 #calls this out as a df called override_df
+
+sheet_short = client.open("analyst_overrides_short")
+
+@st.cache_data
+def fetch_overrides(country: str, year: int):
+    sheet_short = client.open("analyst_overrides_short")
+    return load_override_from_gsheet(sheet_short, country, year)
+
+override_df = fetch_overrides(selected_name, selected_year)
 
 ## Loading block complete ##
 
@@ -677,6 +719,9 @@ with save_col_short:
         
         # Use the full Google Sheet, then pass selected_name to target the right tab
         save_override_to_gsheet(sheet_short, updated_subset, selected_name, selected_year)
+
+        # clear only the cache for fetch_overrides
+        fetch_overrides.clear()
         
         st.success("✅ Overrides saved and rating updated.")
         st.rerun() #rerun entire script from top to bottom so analyst can see update immediately
@@ -792,7 +837,16 @@ long_table_df = long_table_df.rename(columns={'long_name':'Factor','description'
 sheet_long = client.open("analyst_overrides_long")
 
 ## With the connection established. Let us load the analyst overrides into our long_table_df
-override_df_long = load_override_from_gsheet(sheet_long, selected_name, selected_year)
+
+# Do similar caching to short_table above. only load unique country year combination once unless there is edit.
+@st.cache_data
+def fetch_overrides_long(country: str, year: int):
+    sheet_long = client.open("analyst_overrides_long")
+    return load_override_from_gsheet(sheet_long, country, year)
+
+override_df_long = fetch_overrides_long(selected_name, selected_year)
+
+## override_df_long = load_override_from_gsheet(sheet_long, selected_name, selected_year)
 #what this function does is looks at the google sheet object (sheet_long in this case)
 #uses selected_name to find the relevant country tab (cos i named each tab with a different country name)
 #within the country tab, searches for overrides in a specific year (selected_year) "short_name", "Adjustment", "Analyst Comment"
@@ -1366,6 +1420,9 @@ with save_col_long:
 
         # Use the full Google Sheet, then pass selected_name to target the right tab
         save_override_to_gsheet(sheet_long, updated_subset_long, selected_name, selected_year)
+
+        # clear only the cache for fetch_overrides
+        fetch_overrides_long.clear()
 
         st.success("✅ Overrides saved and rating updated.")
         st.rerun() #rerun entire script from top to bottom so analyst can see update immediately
