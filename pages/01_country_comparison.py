@@ -177,6 +177,29 @@ variable_dict = {
 
 }
 
+# map each short_var to a Python format‐string for its value
+format_map = {
+    "ngdp_pc":"${value:,.0f}",
+    "ngdp":"${value:,.1f} bil",
+    "growth_avg": "{value:.1f}%",
+    "inf_avg":    "{value:.1f}%",
+    "default_hist": "{value:.0f}",
+    "default_decay": "{value:.2f}",
+    "voice_acct": "{value:.2f}",
+    "pol_stab": "{value:.2f}",
+    "gov_eff": "{value:.2f}",
+    "reg_qual":"{value:.2f}",
+    "rule_law":"{value:.2f}",
+    "cont_corrupt": "{value:.2f}",
+    "fb_avg": "{value:.1f}% of GDP",
+    "gov_rev_gdp": "{value:.1f}% of GDP",
+    "ir_rev": "{value:.1f}% of revenue",
+    "gov_debt_gdp": "{value:.1f}% of GDP",
+    "cab_avg": "{value:.1f}% of GDP",
+    "reserve_gdp": "{value:.1f}% of GDP",
+    "import_cover": "{value:.1f} months of imports",
+    "reserve_fx": "{value:.0f}"}
+
 # Build the figure
 fig_factor = go.Figure()
 
@@ -259,128 +282,493 @@ fig_factor.update_yaxes(
 #5) In Streamlit, render full-width
 st.plotly_chart(fig_factor, use_container_width=True)
 
-# Wealth
-st.subheader("Wealth Factor")
+####----Define histogram function for rapid chart building---####
 
-# 1) Your data
-short_var = "ngdp_pc"
-vals = df_raw_filter[short_var].dropna()
+def build_variable_histogram(
+    short_var: str,
+    df_peers: pd.DataFrame,
+    selected_row: pd.Series,
+    selected_name: str,
+    selected_bucket: str,
+    variable_dict: dict,
+    bins_rule: str = "fd", #or "sturges"
+    format_map = dict #custom formatting dict
+):
+    """
+    Plots a histogram of `short_var` for peers (df_peers),
+    with FD‐optimal bins, dotted percentile lines, a red line for the selected country,
+    and a two‐line HTML title including the country’s value & percentile.
+    """
+    import numpy as np
+    import pandas as pd
+    import plotly.graph_objects as go
+    import streamlit as st
 
-# 2) Compute FD‐optimal edges
-edges   = np.histogram_bin_edges(vals, bins="fd")
-bin_size = edges[1] - edges[0]
-start, end = edges[0], edges[-1]
+    # 1) Data & label lookup
+    vals = df_peers[short_var].dropna()
+    long_var = variable_dict.get(short_var, short_var)
 
-# 3) Compute percentiles
-p5, p25, p50, p75, p95 = np.percentile(vals, [5,25,50,75,95])
+    # 2) Compute bin edges via the chosen rule (e.g. "fd" or "sturges")
+    edges   = np.histogram_bin_edges(vals, bins=bins_rule)
+    bin_size = edges[1] - edges[0]
+    start, end = edges[0], edges[-1]
 
-# 4) Build the figure
-fig = go.Figure()
+    # 3) Percentiles
+    p5, p25, p50, p75, p95 = np.percentile(vals, [5,25,50,75,95])
 
-# Histogram with FD bins
-fig.add_trace(go.Histogram(
-    x=vals,
-    xbins=dict(
-        start=start,
-        end=end,
-        size=bin_size
-    ),
-    marker_color="#DAEEF3",
-    opacity=0.75,
-    name="Peers"
-))
+    # 4) Build the figure
+    fig = go.Figure()
+    fig.add_trace(go.Histogram(
+        x=vals,
+        xbins=dict(start=start, end=end, size=bin_size),
+        marker_color="#DAEEF3",
+        opacity=0.75,
+        name="Peers"
+    ))
 
-# 5) Dotted percentile lines
-for x_val, label in [
-    (p5,  "5th"),
-    (p25, "25th"),
-    (p50, "Median"),
-    (p75, "75th"),
-    (p95, "95th"),
-]:
+    # 5) Dotted percentile lines
+    for x_val, label in [(p5,"5th"), (p25,"25th"), (p50,"Median"),
+                         (p75,"75th"), (p95,"95th")]:
+        fig.add_vline(
+            x=x_val,
+            line=dict(color="gray", dash="dot", width=2),
+            annotation_text=label,
+            annotation_position="top left"
+        )
+
+    # 6) Red country line
+    my_val = selected_row[short_var]
     fig.add_vline(
-        x=x_val,
-        line=dict(color="gray", dash="dot", width=2),
-        annotation_text=label,
-        annotation_position="top left"
+        x=my_val,
+        line=dict(color="red", width=3),
+        annotation_text=selected_name,
+        annotation_position = "bottom right",
+        annotation_font_color = "red"
     )
 
-# 6) Country line & label
-my_val = selected_row_raw.iloc[0][short_var]
-fig.add_vline(
-    x=my_val,
-    line=dict(color="red", width=3),
-    annotation_text=selected_name,
-    annotation_position="bottom right",
-    annotation_font_color="red"
-)
+    # 7) Axis styling
+    fig.update_xaxes(
+        title_text=long_var,
+        title_font_color="black",
+        tickfont_color="black",
+        showline=True,
+        linecolor="black"
+    )
+    fig.update_yaxes(
+        title_text="Count",
+        title_font_color="black",
+        tickfont_color="black",
+        showline=True,
+        linecolor="black"
+    )
 
-# 7) Style axes
-long_var = variable_dict[short_var]
-fig.update_xaxes(
-    title_text=long_var,
-    title_font_color="black",
-    tickfont_color="black",
-    showline=True,
-    linecolor="black"
-)
-fig.update_yaxes(
-    title_text="Count",
-    title_font_color="black",
-    tickfont_color="black",
-    showline=True,
-    linecolor="black"
-)
+    # 8) Compute country percentile
+    percentile = np.mean(vals <= my_val) * 100
 
-#A) Compute the country’s percentile
-percentile = np.mean(vals <= my_val) * 100  # gives a value between 0–100
+    # 9) Title with inline red line
 
-#B) Build a multi-line HTML title
-title_text = (
+    # then, given your short_var & my_val:
+    fmt = format_map.get(short_var, "{value}")
+    formatted_val = fmt.format(value=my_val)
+    
+    # and in your title line:
+    title_text = (
     f"{selected_name} vs {selected_bucket} peers<br>"
-    # second line in red:
-    f"<span style='color:red'>{selected_name}: ${my_val:,.0f} "
-    f"({percentile:.1f}th percentile)</span>"
-)
+    f"<span style='color:red'>{selected_name}: "
+    f"{formatted_val} ({percentile:.0f}th percentile)</span>")
 
-# 8) Final layout & render
-fig.update_layout(
-    title=title_text,
-    template="simple_white",
-    margin=dict(t=80, b=40, l=40, r=20),
-    showlegend=False
-)
+    fig.update_layout(
+        title=title_text,
+        template="simple_white",
+        margin=dict(t=80, b=40, l=40, r=20),
+        showlegend=False)
+    
+    # 10) return a fig object, which we then input into st.plotly to plot where we want it!
+    return fig
 
-st.plotly_chart(fig, use_container_width=True)
+def build_dummy_histogram(
+    short_var: str,
+    df_peers,
+    selected_row,
+    selected_name: str,
+    selected_bucket: str,
+    variable_dict: dict,
+    bins_rule: str = "fd",
+    format_map: dict = None
+) -> go.Figure:
+    """
+    Builds a Plotly histogram figure for a given variable.
+    
+    Parameters:
+    - short_var: column name to plot (short code)
+    - df_peers: peers DataFrame, already filtered
+    - selected_row: pd.Series for the selected country (one row)
+    - selected_name: displayed country name
+    - selected_bucket: bucket label (e.g. "BBB", "ALL")
+    - variable_dict: mapping short_var -> long display name
+    - bins_rule: "fd" (Freedman–Diaconis), "sturges", or "dummy"
+    - format_map: mapping short_var -> Python format string
+    
+    Returns:
+    - Plotly Figure
+    """
+   
+    # Extract peers values and display name
+    vals = df_peers[short_var].dropna()
+    long_var = variable_dict.get(short_var, short_var)
 
-#st.plotly_chart(fig, use_container_width=True)
+    # Start a new figure
+    fig = go.Figure()
 
-# Size
+    if bins_rule.lower() == "dummy":
+        # Two-bin histogram for 0/1 dummy
+        fig.add_trace(go.Histogram(
+            x=vals,
+            xbins=dict(start=0, end=2, size=1),
+            marker_color="#DAEEF3",
+            opacity=0.75,
+            name="Peers"
+        ))
+    elif bins_rule.lower() == "ten":
+        # Fixed 10-bin histogram
+        fig.add_trace(go.Histogram(
+        x=vals,
+        nbinsx=10,
+        marker_color="#DAEEF3",
+        opacity=0.75,
+        name="Peers"
+        ))
+    else:
+        # Continuous histogram with FD or Sturges rule
+        edges = np.histogram_bin_edges(vals, bins=bins_rule)
+        bin_size = edges[1] - edges[0]
+        start, end = edges[0], edges[-1]
+        fig.add_trace(go.Histogram(
+            x=vals,
+            xbins=dict(start=start, end=end, size=bin_size),
+            marker_color="#DAEEF3",
+            opacity=0.75,
+            name="Peers"
+        ))
+        
+    # Reference line for the selected country
+    my_val = selected_row[short_var]
+    fig.add_vline(
+        x=my_val,
+        line=dict(color="red", width=3),
+        annotation_text=selected_name,
+        annotation_position="bottom right",
+        annotation_font_color="red"
+    )
+
+    # Style axes uniformly
+    fig.update_xaxes(
+        title_text=long_var,
+        title_font_color="black",
+        tickfont_color="black",
+        showline=True,
+        linecolor="black",
+        tickmode="array" if bins_rule.lower() == "dummy" else "auto",
+        tickvals=[0, 1] if bins_rule.lower() == "dummy" else None
+    )
+    fig.update_yaxes(
+        title_text="Count",
+        title_font_color="black",
+        tickfont_color="black",
+        showline=True,
+        linecolor="black"
+    )
+
+    # Compute and format the selected country’s value & percentile
+    percentile = np.mean(vals <= my_val) * 100
+    fmt_str = format_map.get(short_var, "{value}")
+    formatted_val = fmt_str.format(value=my_val)
+
+    # Build two-line HTML title
+    title_text = (
+        f"{selected_name} vs {selected_bucket} peers<br>"
+        f"<span style='color:red'>{selected_name}: {formatted_val} "
+        f"({percentile:.0f}th percentile)</span>"
+    )
+    fig.update_layout(
+        title=title_text,
+        template="simple_white",
+        margin=dict(t=80, b=40, l=40, r=20),
+        showlegend=False
+    )
+
+    return fig
+
+####----Wealth----####
+st.subheader("Wealth Factor")
+
+fig_ngdp_pc = build_variable_histogram(
+    short_var="ngdp_pc",
+    df_peers = df_raw_filter,
+    selected_row = selected_row_raw.iloc[0],
+    selected_name = selected_name,
+    selected_bucket = selected_bucket,
+    variable_dict = variable_dict,
+    bins_rule = "fd",
+    format_map = format_map)
+
+st.plotly_chart(fig_ngdp_pc,use_container_width=True)
+
+####----Size----####
 st.subheader("Size Factor")
 
-# Growth
+fig_ngdp = build_variable_histogram(
+    short_var="ngdp",
+    df_peers = df_raw_filter,
+    selected_row = selected_row_raw.iloc[0],
+    selected_name = selected_name,
+    selected_bucket = selected_bucket,
+    variable_dict = variable_dict,
+    bins_rule = "fd",
+    format_map = format_map)
+
+st.plotly_chart(fig_ngdp,use_container_width=True)
+
+####----Growth----####
 st.subheader("Growth Factor")
 
-# Inflation
+fig_growth_avg = build_variable_histogram(
+    short_var="growth_avg",
+    df_peers = df_raw_filter,
+    selected_row = selected_row_raw.iloc[0],
+    selected_name = selected_name,
+    selected_bucket = selected_bucket,
+    variable_dict = variable_dict,
+    bins_rule = "fd",
+    format_map = format_map)
+
+st.plotly_chart(fig_growth_avg,use_container_width=True)
+
+####----Inflation----####
 st.subheader("Inflation Factor")
 
-# Default
+fig_inf_avg = build_variable_histogram(
+    short_var="inf_avg",
+    df_peers = df_raw_filter,
+    selected_row = selected_row_raw.iloc[0],
+    selected_name = selected_name,
+    selected_bucket = selected_bucket,
+    variable_dict = variable_dict,
+    bins_rule = "fd",
+    format_map = format_map)
+
+st.plotly_chart(fig_inf_avg,use_container_width=True)
+
+####----Default----####
 st.subheader("Default History Factor")
 
-# Governance
+fig_default = build_dummy_histogram(
+    short_var="default_hist",
+    df_peers = df_raw_filter,
+    selected_row = selected_row_raw.iloc[0],
+    selected_name = selected_name,
+    selected_bucket = selected_bucket,
+    variable_dict = variable_dict,
+    bins_rule = "dummy",
+    format_map = format_map)
+
+fig_decay = build_dummy_histogram(
+    short_var="default_decay",
+    df_peers = df_raw_filter,
+    selected_row = selected_row_raw.iloc[0],
+    selected_name = selected_name,
+    selected_bucket = selected_bucket,
+    variable_dict = variable_dict,
+    bins_rule = "ten",
+    format_map = format_map)
+
+col1, col2 = st.columns(2)
+col1.plotly_chart(fig_default, use_container_width=True)
+col2.plotly_chart(fig_decay, use_container_width=True)
+
+####----Governance----####
 st.subheader("Governance Factor")
 
-# Fiscal Performance
+fig_voice = build_variable_histogram(
+    short_var="voice_acct",
+    df_peers = df_raw_filter,
+    selected_row = selected_row_raw.iloc[0],
+    selected_name = selected_name,
+    selected_bucket = selected_bucket,
+    variable_dict = variable_dict,
+    bins_rule = "fd",
+    format_map = format_map)
+
+fig_pol = build_variable_histogram(
+    short_var="pol_stab",
+    df_peers = df_raw_filter,
+    selected_row = selected_row_raw.iloc[0],
+    selected_name = selected_name,
+    selected_bucket = selected_bucket,
+    variable_dict = variable_dict,
+    bins_rule = "fd",
+    format_map = format_map)
+
+fig_gov = build_variable_histogram(
+    short_var="gov_eff",
+    df_peers = df_raw_filter,
+    selected_row = selected_row_raw.iloc[0],
+    selected_name = selected_name,
+    selected_bucket = selected_bucket,
+    variable_dict = variable_dict,
+    bins_rule = "fd",
+    format_map = format_map)
+
+fig_reg = build_variable_histogram(
+    short_var="reg_qual",
+    df_peers = df_raw_filter,
+    selected_row = selected_row_raw.iloc[0],
+    selected_name = selected_name,
+    selected_bucket = selected_bucket,
+    variable_dict = variable_dict,
+    bins_rule = "fd",
+    format_map = format_map)
+
+fig_law = build_variable_histogram(
+    short_var="rule_law",
+    df_peers = df_raw_filter,
+    selected_row = selected_row_raw.iloc[0],
+    selected_name = selected_name,
+    selected_bucket = selected_bucket,
+    variable_dict = variable_dict,
+    bins_rule = "fd",
+    format_map = format_map)
+
+fig_corrupt = build_variable_histogram(
+    short_var="cont_corrupt",
+    df_peers = df_raw_filter,
+    selected_row = selected_row_raw.iloc[0],
+    selected_name = selected_name,
+    selected_bucket = selected_bucket,
+    variable_dict = variable_dict,
+    bins_rule = "fd",
+    format_map = format_map)
+
+col1, col2 = st.columns(2)
+col1.plotly_chart(fig_voice, use_container_width=True)
+col2.plotly_chart(fig_pol, use_container_width=True)
+
+col3, col4 = st.columns(2)
+col3.plotly_chart(fig_gov, use_container_width=True)
+col4.plotly_chart(fig_reg, use_container_width=True)
+
+col5, col6 = st.columns(2)
+col5.plotly_chart(fig_law, use_container_width=True)
+col6.plotly_chart(fig_corrupt, use_container_width=True)
+
+####----Fiscal Performance----####
 st.subheader("Fiscal Performance Factor")
 
-# Government Debt
+fig_fb = build_variable_histogram(
+    short_var="fb_avg",
+    df_peers = df_raw_filter,
+    selected_row = selected_row_raw.iloc[0],
+    selected_name = selected_name,
+    selected_bucket = selected_bucket,
+    variable_dict = variable_dict,
+    bins_rule = "fd",
+    format_map = format_map)
+
+fig_rev = build_variable_histogram(
+    short_var="gov_rev_gdp",
+    df_peers = df_raw_filter,
+    selected_row = selected_row_raw.iloc[0],
+    selected_name = selected_name,
+    selected_bucket = selected_bucket,
+    variable_dict = variable_dict,
+    bins_rule = "fd",
+    format_map = format_map)
+
+fig_ir = build_variable_histogram(
+    short_var="ir_rev",
+    df_peers = df_raw_filter,
+    selected_row = selected_row_raw.iloc[0],
+    selected_name = selected_name,
+    selected_bucket = selected_bucket,
+    variable_dict = variable_dict,
+    bins_rule = "fd",
+    format_map = format_map)
+
+st.plotly_chart(fig_fb,use_container_width=True)
+
+col1, col2 = st.columns(2)
+col1.plotly_chart(fig_rev, use_container_width=True)
+col2.plotly_chart(fig_ir, use_container_width=True)
+
+###----Government Debt----####
 st.subheader("Government Debt Factor")
 
-# External Performance
+fig_debt = build_variable_histogram(
+    short_var="gov_debt_gdp",
+    df_peers = df_raw_filter,
+    selected_row = selected_row_raw.iloc[0],
+    selected_name = selected_name,
+    selected_bucket = selected_bucket,
+    variable_dict = variable_dict,
+    bins_rule = "fd",
+    format_map = format_map)
+
+st.plotly_chart(fig_debt,use_container_width=True)
+
+####----External Performance----####
 st.subheader("External Performance Factor")
 
-# FX Reserves
+fig_cab = build_variable_histogram(
+    short_var="cab_avg",
+    df_peers = df_raw_filter,
+    selected_row = selected_row_raw.iloc[0],
+    selected_name = selected_name,
+    selected_bucket = selected_bucket,
+    variable_dict = variable_dict,
+    bins_rule = "fd",
+    format_map = format_map)
+
+st.plotly_chart(fig_cab,use_container_width=True)
+
+####----FX Reserves----####
 st.subheader("FX Reserves Factor")
 
-# Reserve Currency Status
+fig_reserve = build_variable_histogram(
+    short_var="reserve_gdp",
+    df_peers = df_raw_filter,
+    selected_row = selected_row_raw.iloc[0],
+    selected_name = selected_name,
+    selected_bucket = selected_bucket,
+    variable_dict = variable_dict,
+    bins_rule = "fd",
+    format_map = format_map)
+
+fig_import = build_variable_histogram(
+    short_var="import_cover",
+    df_peers = df_raw_filter,
+    selected_row = selected_row_raw.iloc[0],
+    selected_name = selected_name,
+    selected_bucket = selected_bucket,
+    variable_dict = variable_dict,
+    bins_rule = "fd",
+    format_map = format_map)
+
+col1, col2 = st.columns(2)
+col1.plotly_chart(fig_reserve, use_container_width=True)
+col2.plotly_chart(fig_import, use_container_width=True)
+
+####----Reserve Currency Status----####
 st.subheader("Reserve Currency Factor")
+
+fig_status = build_dummy_histogram(
+    short_var="reserve_fx",
+    df_peers = df_raw_filter,
+    selected_row = selected_row_raw.iloc[0],
+    selected_name = selected_name,
+    selected_bucket = selected_bucket,
+    variable_dict = variable_dict,
+    bins_rule = "dummy",
+    format_map = format_map)
+
+col1, col2 = st.columns(2)
+col1.plotly_chart(fig_status, use_container_width=True)
