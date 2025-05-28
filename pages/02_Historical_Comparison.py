@@ -1,0 +1,250 @@
+import streamlit as st
+import pandas as pd
+from pathlib import Path
+import plotly.graph_objects as go
+import numpy as np
+
+## Page content. how it shows up on the side bar. how the page is laid out. wide in this case.
+st.set_page_config(
+    page_title="Historical Comparison",
+    layout="wide",
+)
+
+## Load the data. Cache so user only loads once upon use.
+
+BASE_DIR = Path(__file__).resolve().parent.parent #file --> refers to where current py lives. parent parent goes up two levels
+
+@st.cache_data
+def load_all_excels():
+    return (
+        pd.read_excel(BASE_DIR/"transform_data.xlsx"),
+        pd.read_excel(BASE_DIR/"raw_data.xlsx"),
+        pd.read_excel(BASE_DIR/"coefficients_apr2024.xlsx"),
+        pd.read_excel(BASE_DIR/"index_rating_scale.xlsx"),
+        pd.read_excel(BASE_DIR/"index_variable_name.xlsx"),
+        pd.read_excel(BASE_DIR/"index_country.xlsx"),
+        pd.read_excel(BASE_DIR/"index_bbg_rating_live.xlsx", sheet_name="hard_code"),
+    )
+df_transform, df_raw, coeff_index, rating_index, variable_index, country_index, public_rating_index = load_all_excels()
+
+factors = ["wealth_factor",
+           "size_factor",
+           "growth_factor",
+           "inflation_factor",
+           "default_factor",
+           "governance_factor",
+           "fiscalperf_factor",
+           "govdebt_factor",
+           "extperf_factor",
+           "reservebuffer_factor",
+           "reservestatus_factor",
+           ]
+
+factors_dict = {
+    "wealth_factor":       "Wealth",
+    "size_factor":         "Size",
+    "growth_factor":       "Growth",
+    "inflation_factor":    "Inflation",
+    "default_factor":      "Default History",
+    "governance_factor":   "Governance",
+    "fiscalperf_factor":   "Fiscal Performance",
+    "govdebt_factor":      "Government Debt",
+    "extperf_factor":      "External Performance",
+    "reservebuffer_factor":"FX Reserves",
+    "reservestatus_factor":"Reserve Currency Status"
+}
+
+variable_dict = {
+    "ngdp_pc":       "Nominal GDP per capita (US$)",
+    "ngdp":         "Nominal GDP (bil US$)",
+    "growth_avg":       "Avg 10Yr GDP Growth t-5 to t+4 (%)",
+    "inf_avg":    "Average 10Yr Inflation t-5 to t+4 (%)",
+    "default_hist":      "Default History Dummy (1=Yes, 0=No)",
+    "default_decay":   "Default Decay (1 at incidence)",
+    "voice_acct":   "Voice and Accountability (Z-score)",
+    "pol_stab":      "Political Stability (Z-score)",
+    "gov_eff":      "Government Effectiveness (Z-score)",
+    "reg_qual":"Regulatory Quality (Z-score)",
+    "rule_law":"Rule of Law (Z-score)",
+    "cont_corrupt": "Control of Corruption (Z-score)",
+    "fb_avg": "Avg 10Yr Fiscal Balance t-5 to t+4 (% of GDP)",
+    "gov_rev_gdp": "Government Revenue (% of GDP)",
+    "ir_rev": "Interest Payment (% of Revenue)",
+    "gov_debt_gdp": "Government Debt (% of GDP)",
+    "cab_avg": "Avg 10Yr Current Account Balance t-5 to t+4 (% of GDP)",
+    "reserve_gdp": "FX Reserves (% of GDP)",
+    "import_cover": "FX Reserves (months of imports)",
+    "reserve_fx": "Reserve Currency Status (1 = Yes, 0 = No)"
+
+}
+
+# map each short_var to a Python format‐string for its value
+format_map = {
+    "ngdp_pc":"${value:,.0f}",
+    "ngdp":"${value:,.1f} bil",
+    "growth_avg": "{value:.1f}%",
+    "inf_avg":    "{value:.1f}%",
+    "default_hist": "{value:.0f}",
+    "default_decay": "{value:.2f}",
+    "voice_acct": "{value:.2f}",
+    "pol_stab": "{value:.2f}",
+    "gov_eff": "{value:.2f}",
+    "reg_qual":"{value:.2f}",
+    "rule_law":"{value:.2f}",
+    "cont_corrupt": "{value:.2f}",
+    "fb_avg": "{value:.1f}% of GDP",
+    "gov_rev_gdp": "{value:.1f}% of GDP",
+    "ir_rev": "{value:.1f}% of revenue",
+    "gov_debt_gdp": "{value:.1f}% of GDP",
+    "cab_avg": "{value:.1f}% of GDP",
+    "reserve_gdp": "{value:.1f}% of GDP",
+    "import_cover": "{value:.1f} months of imports",
+    "reserve_fx": "{value:.0f}"}
+
+# Create Gap Variable
+
+df_transform.insert(
+    loc=5, 
+    column="gap", 
+    value=df_transform["predicted_rating"] - df_transform["rating"])
+
+# calculate gap and insert it as the 6th column (index position 5)
+#interpret this as, if predicted rating > rating. shade green. positive rating pressure.
+#if predicted rating < rating. shade red. negative rating pressure.
+
+## Make country and year selection boxes
+
+st.markdown("""
+<style>
+/* 🔹 Limit the max width of selectboxes */
+div[data-baseweb="select"] {
+    max-width: 300px !important;
+}
+</style>
+""", unsafe_allow_html=True)
+
+## Dropdown to select Country
+
+country_name = df_transform['name'].unique()
+selected_name = st.selectbox("Select Country", sorted(country_name))
+
+## Filter both df_transform and df_raw to include only the selected country
+
+df_transform_filter = df_transform[df_transform["name"] == selected_name]
+df_raw_filter = df_raw[df_raw["name"] == selected_name]
+
+## Define Loomis Colors for use later
+
+LS_darkblue = "#1A3B73"
+LS_lightblue = "#B6CEE4"
+LS_faintblue = "#DAEEF3"
+LS_darkgrey = "#91929B"
+LS_lightgrey = "#E9E9EB"
+LS_orange = "#EF7622"
+
+#st.dataframe(df_transform_filter)  ---> unlock if you want to check if your df is filtering properly
+
+####----Historical Credit Rating----####
+st.subheader("Sovereign Credit Rating Over The Years")
+
+# Initialize the Figure
+fig_rating = go.Figure()
+
+# Define x and y values
+x = df_transform_filter["year"]
+gaps = df_transform_filter["gap"]
+rating = df_transform_filter["rating"]
+model_rating = df_transform_filter["predicted_rating"]
+
+# 1) Predicted rating as line + markers
+fig_rating.add_trace(go.Scatter(
+    x=x,
+    y=model_rating,
+    mode="lines+markers",
+    name="Model Rating",
+    marker=dict(symbol="diamond", size=8, color = LS_darkblue),
+    line=dict(width=2, color = LS_darkblue),
+    hovertemplate="Predicted Rating: %{y:.2f}<extra></extra>"
+))
+
+# 2) Actual rating as line + markers
+fig_rating.add_trace(go.Scatter(
+    x=x,
+    y=rating,
+    mode="lines+markers",
+    name="Public Rating",
+    marker=dict(symbol="circle", size=8, color = LS_darkgrey),
+    line=dict(width=2, color = LS_darkgrey, dash = "dash")
+))
+
+# 3) Gap as bars
+
+# build a color per bar
+bar_colors = ['green' if g >= 0 else 'red' for g in gaps]
+
+fig_rating.add_trace(go.Bar(
+    x=x,
+    y=gaps,
+    name="Gap (Model Rating - Actual Rating)",
+    marker=dict(color=bar_colors),
+    opacity=0.6,
+    hovertemplate='Gap: %{y:.2f}<extra></extra>'
+))
+
+# A) annotation for Upgrade Pressure in that right margin above the x‐axis
+fig_rating.add_annotation(
+    xref="paper", x=1.15,    # 5% into right margin
+    yref="y", y=0,    # just above top of plot
+    text="⬆ Upgrade Pressure",
+    showarrow=False,
+    font=dict(color="green", size=14),
+    align="left",
+    yshift=10
+)
+
+# B) annotation for Downgrade Pressure in that right margin below the x‐axis
+fig_rating.add_annotation(
+    xref="paper", x=1.173,    # 5% into right margin
+    yref="y", y=-0,    # just above top of plot
+    text="⬇ Downgrade Pressure",
+    showarrow=False,
+    font=dict(color="red", size=14),
+    align="left",
+    yshift=-10
+)
+
+# Layout tweaks
+fig_rating.update_layout(
+    title=f"How does {selected_name}'s model rating differ from its public rating?",
+    barmode="overlay",             # bars behind lines
+    template="plotly_white"
+)
+
+fig_rating.update_xaxes(
+    # keep your ticks & label styling
+    title_text="Year",
+    tickfont=dict(color="black"),
+    title=dict(text="Year", font=dict(color="black")),
+    showline=False,
+    mirror=False
+)
+
+fig_rating.update_yaxes(
+    title_text="Rating (1 = D, 22 = AAA)",
+    title_font=dict(color="black"),
+    tickfont=dict(color="black"),
+    showline=True,
+    linecolor="black",
+    mirror=False
+)
+
+# Plot the chart finally!
+st.plotly_chart(fig_rating, use_container_width=True)
+
+####----Historical Macro Fundamentals ----####
+st.subheader("How Have Macro Fundamentals Evolved Over The Years?")
+
+#box plot chart here??
+
+####----Wealth----####
+st.subheader("Wealth Factor")

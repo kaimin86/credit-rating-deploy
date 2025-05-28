@@ -17,6 +17,42 @@ st.set_page_config(
     page_title="LS Sovereign Credit Rating Model",
     layout="wide",
 )
+
+###----Toggle Passwords to split between those with "read" vs those with "write" access----####
+
+# Load passwords from secrets
+password_map = {
+    st.secrets["passwords"]["write"]: "write",
+    st.secrets["passwords"]["read"]: "read"
+}
+
+# Initialize session state on first load
+if "authenticated" not in st.session_state:
+    st.session_state["authenticated"] = False
+    st.session_state["role"] = None
+
+# 🔐 Show login box only if not yet logged in
+if not st.session_state["authenticated"]:
+    st.sidebar.title("Login")
+    password = st.sidebar.text_input("Enter access password", type="password")
+    if st.sidebar.button("Login"):
+        if password in password_map:
+            st.session_state["authenticated"] = True
+            st.session_state["role"] = password_map[password]
+            st.rerun()
+        else:
+            st.sidebar.error("❌ Invalid password")
+
+else:
+    st.sidebar.success(f"✅ Logged in ({st.session_state['role']} mode)")
+    if st.sidebar.button("Logout"): #--> Create a logout button
+        for key in ["authenticated", "role"]:
+            del st.session_state[key]
+        st.rerun()
+
+if not st.session_state["authenticated"]:
+    st.stop()
+
 # Page content
 
 st.title("LS Sovereign Credit Rating Model")
@@ -512,6 +548,10 @@ LS_gridOptions["getRowStyle"] = JsCode("""
   }
 """)
 
+#With that set, clicking your Save button (or anywhere outside the cell) will commit the zero-length string as an actual edit.
+#LS_gridOptions["singleClickEdit"]               = True
+LS_gridOptions["stopEditingWhenCellsLoseFocus"] = True
+
 ## Render the table using AgGrid (and pass in your overrides injecting the CSS injection)
 
 grid_response = AgGrid(
@@ -535,10 +575,17 @@ grid_response = AgGrid(
 ### 'column_state' --> list[dict] --> The state of columns (e.g. width, sort order)
 ### 'rowData' --> list[dict] --> Raw row data as a list of dictionaries (alternative to data)
 
+#grid_response["api"].stopEditing() #Force-commit *any* cell still in edit. helps in deleting strings for analyst comment column.
 ## Captures edits made by user in grid
 updated_df = grid_response["data"] #extracts the updated DataFrame after user edits from AgGrid (adjustment and comments col)
 updated_df["Adjustment"] = pd.to_numeric(updated_df["Adjustment"], errors="coerce").fillna(0) #safety layer to ensure only numeric captured
 #errors = coerce means you dont crash the app if non numeric. just input nan value. which we then turn to zero!
+
+#Similarly here, you convert all blank spaces or white spaces into NA. We then reconvert the NA to "" so that it appears blank in cell.
+#we do this to allow analyst deletion in comments
+updated_df["Analyst Comment"] = updated_df["Analyst Comment"] \
+    .replace(r'^\s*$', pd.NA, regex=True)
+updated_df["Analyst Comment"] = updated_df["Analyst Comment"].fillna("")
 
 # Create formatted excel file for export
 export_short_df = updated_df.drop(columns=['short_name'])
@@ -713,18 +760,21 @@ save_col_short, export_col_short, blank_col_short = st.columns([2, 2, 6])
 
 with save_col_short:
     if st.button("💾 Save Analyst Overrides",key="short_save"):
-        # Save only the override columns (factor-level edits) to a file
-        columns_to_save = ["short_name", "Adjustment", "Analyst Comment"]
-        updated_subset = updated_df[columns_to_save]
+        if st.session_state.get("role") == "write":
+          # Save only the override columns (factor-level edits) to a file
+          columns_to_save = ["short_name", "Adjustment", "Analyst Comment"]
+          updated_subset = updated_df[columns_to_save]
         
-        # Use the full Google Sheet, then pass selected_name to target the right tab
-        save_override_to_gsheet(sheet_short, updated_subset, selected_name, selected_year)
+          # Use the full Google Sheet, then pass selected_name to target the right tab
+          save_override_to_gsheet(sheet_short, updated_subset, selected_name, selected_year)
 
-        # clear only the cache for fetch_overrides
-        fetch_overrides.clear()
+          # clear only the cache for fetch_overrides
+          fetch_overrides.clear()
         
-        st.success("✅ Overrides saved and rating updated.")
-        st.rerun() #rerun entire script from top to bottom so analyst can see update immediately
+          st.success("✅ Overrides saved and rating updated.")
+          st.rerun() #rerun entire script from top to bottom so analyst can see update immediately
+        else:
+          st.warning("🚫 You do not have permission to save overrides. You are in read-only mode.")
 
 with export_col_short:
     st.download_button(
@@ -1226,6 +1276,11 @@ updated_df_long = grid_response_long["data"] #extracts the updated DataFrame aft
 updated_df_long["Adjustment"] = pd.to_numeric(updated_df_long["Adjustment"], errors="coerce").fillna(0) #safety layer to ensure only numeric captured
 #errors = coerce means you dont crash the app if non numeric. just input nan value. which we then turn to zero!
 
+# Same as above. this block of code allows the analyst to delete the string in this column.
+updated_df_long["Analyst Comment"] = updated_df_long["Analyst Comment"] \
+    .replace(r'^\s*$', pd.NA, regex=True)
+updated_df_long["Analyst Comment"] = updated_df_long["Analyst Comment"].fillna("")
+
 # Create formatted excel file for export
 export_long_df = updated_df_long.drop(columns=['short_name'])
 
@@ -1378,6 +1433,9 @@ def generate_custom_export_long(
     for block in [(15,16),(18,23),(26,28),(33,34)]:
         for r in range(block[0], block[1]+1):
             ws.cell(row=r, column=6).font = maroon
+    # blue, non-bold font in F9–F11, F13–F14, F17, F25, F29, F31, F32, F35
+    for coord in ("F9","F10","F11","F13","F14","F17","F25","F29","F31","F32","F35"):
+      ws[coord].font = Font(color="FF0000FF", bold=False)
 
     # 19) Column widths A–F
     widths = {"A":25,"B":52,"C":10,"D":12,"E":11.5,"F":57}
@@ -1414,18 +1472,21 @@ save_col_long, export_col_long, blank_col_long = st.columns([2, 2, 6])
 
 with save_col_long:
     if st.button("💾 Save Analyst Overrides",key="long_save"):
-        # Save only the override columns (factor-level edits) to a file
-        columns_to_save_long = ["short_name", "Adjustment", "Analyst Comment"]
-        updated_subset_long = updated_df_long[columns_to_save_long]
+        if st.session_state.get("role") == "write":
+          # Save only the override columns (factor-level edits) to a file
+          columns_to_save_long = ["short_name", "Adjustment", "Analyst Comment"]
+          updated_subset_long = updated_df_long[columns_to_save_long]
 
-        # Use the full Google Sheet, then pass selected_name to target the right tab
-        save_override_to_gsheet(sheet_long, updated_subset_long, selected_name, selected_year)
+          # Use the full Google Sheet, then pass selected_name to target the right tab
+          save_override_to_gsheet(sheet_long, updated_subset_long, selected_name, selected_year)
 
-        # clear only the cache for fetch_overrides
-        fetch_overrides_long.clear()
+          # clear only the cache for fetch_overrides
+          fetch_overrides_long.clear()
 
-        st.success("✅ Overrides saved and rating updated.")
-        st.rerun() #rerun entire script from top to bottom so analyst can see update immediately
+          st.success("✅ Overrides saved and rating updated.")
+          st.rerun() #rerun entire script from top to bottom so analyst can see update immediately
+        else:
+          st.warning("🚫 You do not have permission to save overrides. You are in read-only mode.")  
 
 with export_col_long:
     st.download_button(

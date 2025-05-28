@@ -77,7 +77,7 @@ rating_ranges = {
     "D": (0,1),            }
 
 #user selects key from rating_ranges dictionary
-selected_bucket = st.selectbox("Peer Group", list(rating_ranges.keys())) 
+selected_bucket = st.selectbox("Peer Group (based on Avg Public Rating)", list(rating_ranges.keys())) 
 #Lookup up lower and upper bound based on rating category selected (tuple unpacking)
 low, high = rating_ranges[selected_bucket] 
 
