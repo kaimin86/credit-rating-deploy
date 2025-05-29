@@ -3,6 +3,7 @@ import pandas as pd
 from pathlib import Path
 import plotly.graph_objects as go
 import numpy as np
+import re
 
 ## Page content. how it shows up on the side bar. how the page is laid out. wide in this case.
 st.set_page_config(
@@ -92,13 +93,13 @@ format_map = {
     "reg_qual":"{value:.2f}",
     "rule_law":"{value:.2f}",
     "cont_corrupt": "{value:.2f}",
-    "fb_avg": "{value:.1f}% of GDP",
-    "gov_rev_gdp": "{value:.1f}% of GDP",
-    "ir_rev": "{value:.1f}% of revenue",
-    "gov_debt_gdp": "{value:.1f}% of GDP",
-    "cab_avg": "{value:.1f}% of GDP",
-    "reserve_gdp": "{value:.1f}% of GDP",
-    "import_cover": "{value:.1f} months of imports",
+    "fb_avg": "{value:.1f}%",
+    "gov_rev_gdp": "{value:.1f}%",
+    "ir_rev": "{value:.1f}%",
+    "gov_debt_gdp": "{value:.1f}%",
+    "cab_avg": "{value:.1f}%",
+    "reserve_gdp": "{value:.1f}%",
+    "import_cover": "{value:.1f}",
     "reserve_fx": "{value:.0f}"}
 
 # Create Gap Variable
@@ -143,6 +144,7 @@ LS_lightgrey = "#E9E9EB"
 LS_orange = "#EF7622"
 
 #st.dataframe(df_transform_filter)  ---> unlock if you want to check if your df is filtering properly
+#st.dataframe(df_raw_filter)  ---> unlock if you want to check if your df is filtering properly
 
 ####----Historical Credit Rating----####
 st.subheader("Sovereign Credit Rating Over The Years")
@@ -244,7 +246,350 @@ st.plotly_chart(fig_rating, use_container_width=True)
 ####----Historical Macro Fundamentals ----####
 st.subheader("How Have Macro Fundamentals Evolved Over The Years?")
 
-#box plot chart here??
+####----Define line chart function for rapid chart building---####
+
+def plot_line_series(
+    data: pd.DataFrame,
+    country: str,
+    column: str,
+    name_map: dict,
+    hover_format_map: dict,
+    base_color: str
+) -> go.Figure:
+    """
+    Plot a time series line+markers for one macro variable with custom styling,
+    using hover_format_map for numeric formatting and labeling the last point.
+
+    Parameters
+    ----------
+    data : pd.DataFrame
+        DataFrame with a 'year' column and the target series column.
+    column : str
+        Name of the column in `data` to plot.
+    name_map : Dict[str, str]
+        Maps column names to descriptive titles for chart headings.
+    hover_format_map : Dict[str, str]
+        Maps column names to Python-format strings for hover text, e.g. "${value:,.1f}".
+    base_color : str
+        Hex code for the series color, e.g. '#0A2342'.
+
+    Returns
+    -------
+    fig : plotly.graph_objects.Figure
+        A Plotly figure object ready for display.
+    """
+    # Derive the chart title
+    title = f"{country} {name_map.get(column, column)}"
+
+    # Extract x/y
+    x_vals = data['year']
+    y_vals = data[column]
+
+    # Build hover template from map
+    fmt = hover_format_map.get(column, '{value:.2f}')
+    hover_template = re.sub(r'\{value:([^}]*)\}', lambda m: f'%{{y:{m.group(1)}}}', fmt) + '<extra></extra>'
+
+    # Create figure
+    fig = go.Figure()
+    fig.add_trace(
+        go.Scatter(
+            x=x_vals,
+            y=y_vals,
+            mode='lines+markers',
+            name=title,
+            line=dict(color=base_color, width=2),
+            marker=dict(symbol='circle', size=6, color=base_color),
+            hovertemplate=hover_template
+        )
+    )
+
+    # Annotate last data point
+    last_x = x_vals.iloc[-1]
+    last_y = y_vals.iloc[-1]
+    label = fmt.format(value=last_y)
+    fig.add_trace(
+        go.Scatter(
+            x=[last_x],
+            y=[last_y],
+            mode='text',
+            text=[label],
+            textposition='top right',
+            showlegend=False,
+            textfont=dict(color=base_color, size=12)
+        )
+    )
+
+    # Layout styling
+    fig.update_layout(
+        title=title,
+        template='plotly_white',
+        xaxis=dict(
+            title=dict(text='Year', font=dict(color='black')),
+            tickfont=dict(color='black'),
+            showline=True,
+            linecolor='black'
+        ),
+        yaxis=dict(
+            showline=True,
+            linecolor='black',
+            tickfont=dict(color='black')
+        ),
+        margin=dict(l=60, r=40, t=80, b=60),
+        showlegend=False
+    )
+
+    return fig
 
 ####----Wealth----####
 st.subheader("Wealth Factor")
+
+fig_ngdp_pc = plot_line_series(
+    data = df_raw_filter,
+    country = selected_name,
+    column = "ngdp_pc",
+    name_map = variable_dict,
+    hover_format_map = format_map,
+    base_color = LS_darkblue
+)
+
+st.plotly_chart(fig_ngdp_pc,use_container_width=True)
+
+####----Size----####
+st.subheader("Size Factor")
+
+fig_ngdp = plot_line_series(
+    data = df_raw_filter,
+    country = selected_name,
+    column = "ngdp",
+    name_map = variable_dict,
+    hover_format_map = format_map,
+    base_color = LS_darkblue
+)
+
+st.plotly_chart(fig_ngdp,use_container_width=True)
+
+####----Growth----####
+st.subheader("Growth Factor")
+
+fig_growth = plot_line_series(
+    data = df_raw_filter,
+    country = selected_name,
+    column = "growth_avg",
+    name_map = variable_dict,
+    hover_format_map = format_map,
+    base_color = LS_darkblue
+)
+
+st.plotly_chart(fig_growth,use_container_width=True)
+
+####----Inflation----####
+st.subheader("Inflation Factor")
+
+fig_inf = plot_line_series(
+    data = df_raw_filter,
+    country = selected_name,
+    column = "inf_avg",
+    name_map = variable_dict,
+    hover_format_map = format_map,
+    base_color = LS_darkblue
+)
+
+st.plotly_chart(fig_inf,use_container_width=True)
+
+####----Default----####
+st.subheader("Default History Factor")
+
+fig_default = plot_line_series(
+    data = df_raw_filter,
+    country = selected_name,
+    column = "default_hist",
+    name_map = variable_dict,
+    hover_format_map = format_map,
+    base_color = LS_darkblue
+)
+
+fig_decay = plot_line_series(
+    data = df_raw_filter,
+    country = selected_name,
+    column = "default_decay",
+    name_map = variable_dict,
+    hover_format_map = format_map,
+    base_color = LS_darkblue
+)
+
+col1, col2 = st.columns(2)
+col1.plotly_chart(fig_default, use_container_width=True)
+col2.plotly_chart(fig_decay, use_container_width=True)
+
+####----Governance----####
+st.subheader("Governance Factor")
+
+fig_voice = plot_line_series(
+    data = df_raw_filter,
+    country = selected_name,
+    column = "voice_acct",
+    name_map = variable_dict,
+    hover_format_map = format_map,
+    base_color = LS_darkblue
+)
+
+fig_pol = plot_line_series(
+    data = df_raw_filter,
+    country = selected_name,
+    column = "pol_stab",
+    name_map = variable_dict,
+    hover_format_map = format_map,
+    base_color = LS_darkblue
+)
+
+fig_gov = plot_line_series(
+    data = df_raw_filter,
+    country = selected_name,
+    column = "gov_eff",
+    name_map = variable_dict,
+    hover_format_map = format_map,
+    base_color = LS_darkblue
+)
+
+fig_reg = plot_line_series(
+    data = df_raw_filter,
+    country = selected_name,
+    column = "reg_qual",
+    name_map = variable_dict,
+    hover_format_map = format_map,
+    base_color = LS_darkblue
+)
+
+fig_law = plot_line_series(
+    data = df_raw_filter,
+    country = selected_name,
+    column = "rule_law",
+    name_map = variable_dict,
+    hover_format_map = format_map,
+    base_color = LS_darkblue
+)
+
+fig_corrupt = plot_line_series(
+    data = df_raw_filter,
+    country = selected_name,
+    column = "cont_corrupt",
+    name_map = variable_dict,
+    hover_format_map = format_map,
+    base_color = LS_darkblue
+)
+
+col1, col2 = st.columns(2)
+col1.plotly_chart(fig_voice, use_container_width=True)
+col2.plotly_chart(fig_pol, use_container_width=True)
+
+col3, col4 = st.columns(2)
+col3.plotly_chart(fig_gov, use_container_width=True)
+col4.plotly_chart(fig_reg, use_container_width=True)
+
+col5, col6 = st.columns(2)
+col5.plotly_chart(fig_law, use_container_width=True)
+col6.plotly_chart(fig_corrupt, use_container_width=True)
+
+####----Fiscal Performance----####
+st.subheader("Fiscal Performance Factor")
+
+fig_fb = plot_line_series(
+    data = df_raw_filter,
+    country = selected_name,
+    column = "fb_avg",
+    name_map = variable_dict,
+    hover_format_map = format_map,
+    base_color = LS_darkblue
+)
+
+fig_rev = plot_line_series(
+    data = df_raw_filter,
+    country = selected_name,
+    column = "gov_rev_gdp",
+    name_map = variable_dict,
+    hover_format_map = format_map,
+    base_color = LS_darkblue
+)
+
+fig_ir = plot_line_series(
+    data = df_raw_filter,
+    country = selected_name,
+    column = "ir_rev",
+    name_map = variable_dict,
+    hover_format_map = format_map,
+    base_color = LS_darkblue
+)
+
+st.plotly_chart(fig_fb,use_container_width=True)
+
+col1, col2 = st.columns(2)
+col1.plotly_chart(fig_rev, use_container_width=True)
+col2.plotly_chart(fig_ir, use_container_width=True)
+
+###----Government Debt----####
+st.subheader("Government Debt Factor")
+
+fig_debt = plot_line_series(
+    data = df_raw_filter,
+    country = selected_name,
+    column = "gov_debt_gdp",
+    name_map = variable_dict,
+    hover_format_map = format_map,
+    base_color = LS_darkblue
+)
+
+st.plotly_chart(fig_debt,use_container_width=True)
+
+####----External Performance----####
+st.subheader("External Performance Factor")
+
+fig_cab = plot_line_series(
+    data = df_raw_filter,
+    country = selected_name,
+    column = "cab_avg",
+    name_map = variable_dict,
+    hover_format_map = format_map,
+    base_color = LS_darkblue
+)
+
+st.plotly_chart(fig_cab,use_container_width=True)
+
+####----FX Reserves----####
+st.subheader("FX Reserves Factor")
+
+fig_reserve = plot_line_series(
+    data = df_raw_filter,
+    country = selected_name,
+    column = "reserve_gdp",
+    name_map = variable_dict,
+    hover_format_map = format_map,
+    base_color = LS_darkblue
+)
+
+fig_import = plot_line_series(
+    data = df_raw_filter,
+    country = selected_name,
+    column = "import_cover",
+    name_map = variable_dict,
+    hover_format_map = format_map,
+    base_color = LS_darkblue
+)
+
+col1, col2 = st.columns(2)
+col1.plotly_chart(fig_reserve, use_container_width=True)
+col2.plotly_chart(fig_import, use_container_width=True)
+
+####----Reserve Currency Status----####
+st.subheader("Reserve Currency Factor")
+
+fig_status = plot_line_series(
+    data = df_raw_filter,
+    country = selected_name,
+    column = "reserve_fx",
+    name_map = variable_dict,
+    hover_format_map = format_map,
+    base_color = LS_darkblue
+)
+
+col1, col2 = st.columns(2)
+col1.plotly_chart(fig_status, use_container_width=True)
