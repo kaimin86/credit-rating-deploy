@@ -573,6 +573,46 @@ two_dp = [
 dummy_dp = ["Default History Dummy (1=Yes, 0=No)",
             "Reserve Currency Status (1 = Yes, 0 = No)"]
 
+def style_variable_cell_long(row: pd.Series) -> pd.Series:
+    """
+    row.name is the integer index (0, 1, 2, …).
+    row["Variable"] is the label, e.g. "Avg Public Rating", "Wealth (5%)", etc.
+
+    We return a Series of CSS strings—one per column in this row—according to:
+      • If row["Variable"] is "Avg Public Rating" or "Model Rating": 
+            shade every cell in this row LS_orange, black bold text.
+      • If row["Variable"] is one of the other specified variables (Wealth, Size, etc.):
+            shade every cell in this row LS_faintblue, black bold text.
+      • Else: leave all cells in this row unstyled ("").
+    """
+    out = pd.Series("", index=row.index)
+    var = row["Variable"]
+
+    orange_set = {"Avg Public Rating", "Model Rating"}
+    blue_set = {
+        "Wealth (5%)",
+        "Size (18%)",
+        "Growth (2%)",
+        "Inflation (3%)",
+        "Default History (9%)",
+        "Governance (32%)",
+        "Fiscal Performance (7%)",
+        "Government Debt (10%)",
+        "External Performance (5%)",
+        "FX Reserves (4%)",
+        "Reserve Currency Status (5%)"
+    }
+
+    if var in orange_set:
+        css = f"background-color: {LS_orange}; color: black; font-weight: bold;"
+        out["Variable"] = css
+    elif var in blue_set:
+        css = f"background-color: {LS_faintblue}; color: black; font-weight: bold;"
+        out[:] = css
+    # else: leave out[:] as "" so no styling
+
+    return out
+
 styler_long = (
     heatmap_df_long.style
         # (a) Put a gradient on numeric rows only:
@@ -637,12 +677,13 @@ styler_long = (
         )
 
         # apply style_variable_cell to our whole df. this function mainly defines how i want the variable column to look
-        #.apply(style_variable_cell, axis=1)
+        .apply(style_variable_cell_long, axis=1)
         # (e) Hide Streamlit’s default integer index (pandas ≥ 1.4.0)
         #.hide_index()
 )
 
+# LEts render the table nicely
 
-#finally lets render the raw table to see if we did it correctly
+
 
 st.write(styler_long)
