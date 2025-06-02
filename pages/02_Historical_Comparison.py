@@ -11,6 +11,9 @@ st.set_page_config(
     layout="wide",
 )
 
+## Page title
+st.title("Historical Comparison")
+
 ## Load the data. Cache so user only loads once upon use.
 
 BASE_DIR = Path(__file__).resolve().parent.parent #file --> refers to where current py lives. parent parent goes up two levels
