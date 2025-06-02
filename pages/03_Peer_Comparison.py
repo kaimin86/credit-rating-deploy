@@ -684,6 +684,4 @@ styler_long = (
 
 # LEts render the table nicely
 
-
-
 st.write(styler_long)
