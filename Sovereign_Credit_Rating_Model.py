@@ -741,6 +741,16 @@ def generate_custom_export(
                     "right":  (c == ncols)
                 }
                 ws.cell(row=r, column=c).border = make_border(**sides)
+    # 17b) Wrap text and align cells in case user writes long analyst adjustment
+    # Wrap, top-align, left-align F7:F22
+    for r in range(7, 23):
+        cell = ws.cell(row=r, column=6)
+        cell.alignment = Alignment(wrapText=True, vertical="top", horizontal="left")
+    # Top-align A7:E22
+    for col_idx in range(1, 6):
+        for r in range(7, 23):
+            cell = ws.cell(row=r, column=col_idx)
+            cell.alignment = Alignment(vertical="top")
 
     # 18) Save to BytesIO
     out = BytesIO()
@@ -1452,13 +1462,21 @@ def generate_custom_export_long(
                     left_b= (c==1),
                     right_b=(c==6)
                 )
+    # 20b) Wrap text and align cells in case user writes long analyst adjustment
+    # Wrap text, top-align & left-align F7:F35
+    for r in range(7, 36):
+        cell = ws.cell(row=r, column=6)  # F column
+        cell.alignment = Alignment(wrapText=True, vertical="top", horizontal="left")
+    # Top-align A7:E35 (all other cells in the grid)
+    for col_idx in range(1, 6):  # A–E
+        for r in range(7, 36):
+            ws.cell(row=r, column=col_idx).alignment = Alignment(vertical="top")
 
     # Save to buffer
     out = BytesIO()
     wb.save(out)
     out.seek(0)
     return out
-
 
 excel_data_long = generate_custom_export_long(export_long_df)
 
