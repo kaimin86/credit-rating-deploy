@@ -6,6 +6,11 @@ from pathlib import Path
 import plotly.graph_objects as go
 import numpy as np
 import re
+from io import BytesIO
+from openpyxl import Workbook
+from openpyxl.styles import PatternFill, Font, Alignment, Border, Side
+from openpyxl.utils import get_column_letter
+from openpyxl.formatting.rule import ColorScaleRule
 
 ## Page content. how it shows up on the side bar. how the page is laid out. wide in this case.
 st.set_page_config(
@@ -357,6 +362,127 @@ styler = (
 st.subheader("Rating Factor Heat Map (Z-scores)")
 st.write(styler)
 
+# Create excel export button below
+
+def generate_export_short(df: pd.DataFrame) -> BytesIO:
+    wb = Workbook()
+    ws = wb.active
+
+    # 1a) Write the header row (your country names) into row 1
+    for col_idx, col_name in enumerate(df.columns, start=1):
+        ws.cell(row=1, column=col_idx, value=col_name)
+    
+    # 1b) Write the DataFrame’s values from row 2 onward
+    for row_idx, row in enumerate(df.itertuples(index=False), start=2):
+        for col_idx, val in enumerate(row, start=1):
+            ws.cell(row=row_idx, column=col_idx, value=val)
+
+    # — 2)Recompute dimensions
+    max_row = ws.max_row
+    max_col = ws.max_column
+
+    # — 3) Auto-fit column A width —
+    colA = get_column_letter(1)
+    max_w = max(
+        len(str(ws[f"{colA}{r}"].value or ""))
+        for r in range(1, max_row + 1)
+    )
+    ws.column_dimensions[colA].width = max_w + 1
+    
+    # — 4) Delete contents of A1 —
+    ws["A1"].value = None
+
+    # — 5) Shade & bold A2–A14 —
+    orange = PatternFill("solid", fgColor="FFEF7622")
+    light_tint = PatternFill("solid", fgColor="FFDAEEF3")
+    bold = Font(bold=True)
+    for r in range(2, 15):
+        cell = ws.cell(row=r, column=1)
+        cell.font = bold
+        if r in (2, 3):
+            cell.fill = orange
+        else:
+            cell.fill = light_tint
+
+    # — 6) Header row B1–F1 styling if populated —
+    header_fill = PatternFill("solid", fgColor="FF1A3B73")
+    white_font = Font(color="FFFFFFFF", bold=True)
+    for col_idx in range(2, 7):
+        cell = ws.cell(row=1, column=col_idx)
+        if cell.value not in (None, ""):
+            cell.alignment = Alignment(wrapText=True)
+            cell.font      = white_font
+            cell.fill      = header_fill
+    
+    # — 6b) just force col B1 to F1 to be width 10.0
+    for col in ["B", "C", "D", "E", "F"]:
+        ws.column_dimensions[col].width = 12.0
+
+    # — 7) Numeric formatting B4–F14 & per-row 3-color scale —
+    color_rule = ColorScaleRule(
+        start_type='min',  start_color='FFF8696B',
+        mid_type='percentile', mid_value=50, mid_color='FFEB84',
+        end_type='max',   end_color='FF63BE7B'
+        )
+
+    for r in range(4, 15):
+        # 1) format numbers
+        for col_idx in range(2, 7):
+            cell = ws.cell(row=r, column=col_idx)
+            if isinstance(cell.value, (int, float)):
+                cell.number_format = "0.00"
+        # 2) apply a single color-scale rule to the entire row range B…F
+        rng = f"B{r}:F{r}" #That line is a Python f-string that builds the Excel range address for columns B through F on row r.
+        ws.conditional_formatting.add(rng, color_rule) 
+               
+    # — 8) Map B2–F3 from numeric → letter rating via rating_dict —
+    for r in (2, 3):
+        for col_idx in range(2, 7):
+            cell = ws.cell(row=r, column=col_idx)
+            if isinstance(cell.value, (int, float)):
+                num = round(cell.value)
+                letter = rating_dict.get(num, "")
+                cell.value = letter
+                cell.alignment = Alignment(horizontal="center")
+
+    # — 9) Draw a full border around A1:F14 —
+    thin = Side(style="thin")
+    def mk_border(top=False, bottom=False, left=False, right=False):
+        return Border(
+            top    = thin if top    else Side(style=None),
+            bottom = thin if bottom else Side(style=None),
+            left   = thin if left   else Side(style=None),
+            right  = thin if right  else Side(style=None),
+        )
+    for r in range(1, 15):
+        for c in range(1, 7):
+            if r in (1, 14) or c in (1, 6):
+                ws.cell(row=r, column=c).border = mk_border(
+                    top    = (r == 1),
+                    bottom = (r == 14),
+                    left   = (c == 1),
+                    right  = (c == 6)
+                )
+
+    # — 10) Save to in-memory buffer —
+    output = BytesIO()
+    wb.save(output)
+    output.seek(0)
+    return output
+
+excel_data_short = generate_export_short(heatmap_df)
+
+export_col_short, blank_col_1, blank_col_2 = st.columns([2, 2, 6])
+
+with export_col_short:
+    st.download_button(
+    label="📥 Export to Excel (Formatted)",
+    key="short_excel",
+    data=excel_data_short,
+    file_name="factor_heatmap.xlsx",
+    mime="application/vnd.openxmlformats-officedocument-spreadsheetml.sheet"
+)
+
 ####----Start Building the Constituent Level HeatMap here now that the pre-requisites are set----####
 
 ## First we form the df we want, using the same method as above
@@ -685,3 +811,167 @@ styler_long = (
 # LEts render the table nicely
 
 st.write(styler_long)
+
+# Create excel export button below
+
+def generate_export_long(df: pd.DataFrame) -> BytesIO:
+    wb = Workbook()
+    ws = wb.active
+
+    # 1a) Write the header row (your column names) into row 1
+    for col_idx, col_name in enumerate(df.columns, start=1):
+        ws.cell(row=1, column=col_idx, value=col_name)
+
+    # 1b) Write the DataFrame’s values from row 2 onward (skipping the index)
+    for row_idx, row in enumerate(df.itertuples(index=False), start=2):
+        for col_idx, val in enumerate(row, start=1):
+            ws.cell(row=row_idx, column=col_idx, value=val)
+    
+    # 2) Recompute sheet dimensions for later loops
+    max_row = ws.max_row
+    max_col = ws.max_column
+
+    # 3) Auto-fit column A
+    colA = get_column_letter(1)
+    max_w = max(len(str(ws[f"{colA}{r}"].value or "")) for r in range(1, ws.max_row+1))
+    ws.column_dimensions[colA].width = max_w + 2
+
+    # 4) Clear A1
+    ws["A1"].value = None
+
+    # Styles & helpers
+    orange_fill = PatternFill("solid", fgColor="FFEF7622")
+    tint_fill   = PatternFill("solid", fgColor="FFDAEEF3")
+    header_fill = PatternFill("solid", fgColor="FF1A3B73")
+    bold_font   = Font(bold=True)
+    white_bold  = Font(bold=True, color="FFFFFFFF")
+    wrap        = Alignment(wrapText=True)
+    center      = Alignment(horizontal="center")
+    thin        = Side(style="thin")
+    def mk_border(top=False, bottom=False, left=False, right=False):
+        return Border(
+            top    = thin if top    else Side(style=None),
+            bottom = thin if bottom else Side(style=None),
+            left   = thin if left   else Side(style=None),
+            right  = thin if right  else Side(style=None),
+        )
+
+    # 5) Bold A2–A34
+    for r in range(2, 35):
+        ws.cell(row=r, column=1).font = bold_font
+
+    # 6) Shade A2–A3 orange
+    for r in (2,3):
+        ws.cell(row=r, column=1).fill = orange_fill
+
+    # 7) For each of these rows, clear B–F and shade A–F light tint
+    for r in (4,6,8,10,12,15,22,26,28,30,33):
+        for c in range(2,7):
+            ws.cell(row=r, column=c).value = None
+        for c in range(1,7):
+            ws.cell(row=r, column=c).fill = tint_fill
+
+    # 8) Header row B1–F1: wrap, bold white font, dark-blue fill
+    for c in range(2,7):
+        cell = ws.cell(row=1, column=c)
+        if cell.value not in (None, ""):
+            cell.alignment = wrap
+            cell.font      = white_bold
+            cell.fill      = header_fill
+
+    # 9) Force columns B–F to width 12
+    for c in range(2,7):
+        ws.column_dimensions[get_column_letter(c)].width = 12.0
+
+    # 10) Number‐format each specific row range
+    # B5–F5: whole w/ comma
+    for c in range(2,7):
+        cell = ws.cell(row=5, column=c)
+        if isinstance(cell.value, (int,float)):
+            cell.number_format = "#,##0"
+    # B7–F7: 1 dp w/ comma
+    for c in range(2,7):
+        cell = ws.cell(row=7, column=c)
+        if isinstance(cell.value, (int,float)):
+            cell.number_format = "#,##0.0"
+    # One‐decimal rows:
+    one_dp = [9,11,16,17,18,19,20,21,23,24,25,27,29,31,32]
+    for r in one_dp:
+        for c in range(2,7):
+            cell = ws.cell(row=r, column=c)
+            if isinstance(cell.value, (int,float)):
+                cell.number_format = "0.0"
+    # B13–F13 & B34–F34: whole
+    for r in (13,34):
+        for c in range(2,7):
+            cell = ws.cell(row=r, column=c)
+            if isinstance(cell.value, (int,float)):
+                cell.number_format = "#,##0"
+    # B14–F14: 2 dp but show "0" if zero
+    for c in range(2,7):
+        cell = ws.cell(row=14, column=c)
+        if isinstance(cell.value, (int,float)):
+            if cell.value == 0:
+                cell.number_format = "0"
+            else:
+                cell.number_format = "0.00"
+
+    # 11) Conditional 3-color scales
+    high_good = ColorScaleRule(
+        start_type='min',  start_color='FFF8696B',
+        mid_type='percentile', mid_value=50, mid_color='FFEB84',
+        end_type='max',    end_color='FF63BE7B'
+    )
+    low_good = ColorScaleRule(
+        start_type='min',  start_color='FF63BE7B',
+        mid_type='percentile', mid_value=50, mid_color='FFEB84',
+        end_type='max',    end_color='FFF8696B'
+    )
+    high_rows = [5,7,9,16,17,18,19,20,21,23,24,29,31,32,34]
+    low_rows  = [11,13,14,25,27]
+    for r in high_rows:
+        rng = f"B{r}:F{r}"
+        ws.conditional_formatting.add(rng, high_good)
+    for r in low_rows:
+        rng = f"B{r}:F{r}"
+        ws.conditional_formatting.add(rng, low_good)
+
+    # 12) Map numeric B2–F3 → letter via rating_dict
+    for r in (2,3):
+        for c in range(2,7):
+            cell = ws.cell(row=r, column=c)
+            v = cell.value
+            if isinstance(v, (int,float)):
+                letter = rating_dict.get(round(v), "")
+                cell.value     = letter
+                cell.alignment = center
+
+    # 13) Draw a thin border around A1:F34
+    for r in range(1, 35):
+        for c in range(1, 7):
+            if r in (1,34) or c in (1,6):
+                ws.cell(row=r, column=c).border = mk_border(
+                    top    = (r == 1),
+                    bottom = (r == 34),
+                    left   = (c == 1),
+                    right  = (c == 6)
+                )
+
+    # 14) Save to BytesIO
+    out = BytesIO()
+    wb.save(out)
+    out.seek(0)
+    return out
+
+excel_data_long = generate_export_long(heatmap_df_long)
+
+export_col_long, blank_col_1, blank_col_2 = st.columns([2, 2, 6])
+
+with export_col_long:
+    st.download_button(
+    label="📥 Export to Excel (Formatted)",
+    key="long_excel",
+    data=excel_data_long,
+    file_name="variable_heatmap.xlsx",
+    mime="application/vnd.openxmlformats-officedocument-spreadsheetml.sheet"
+)
