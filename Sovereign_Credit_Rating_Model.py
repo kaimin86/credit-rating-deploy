@@ -432,7 +432,7 @@ function(params) {
   }
   // 2) if it’s numeric, show two decimals
   if (!isNaN(v)) {
-    return parseFloat(v).toFixed(1);
+    return parseFloat(v).toFixed(2);
   }
   // 3) otherwise (e.g. letter), just render as string
   return v.toString();
@@ -683,7 +683,7 @@ def generate_custom_export(
             if e.value == 0:
                 e.value = None
             else:
-                e.number_format = "0.0"
+                e.number_format = "0.00"
 
     # 10A) Blue font in E7:E22 (or up to data_end)
     for r in range(data_start, min(data_end, 22) + 1):
@@ -1049,7 +1049,7 @@ function(params) {
   }
   // 2) if it’s numeric, show two decimals
   if (!isNaN(v)) {
-    return parseFloat(v).toFixed(1);
+    return parseFloat(v).toFixed(2);
   }
   // 3) otherwise (e.g. letter), just render as string
   return v.toString();
@@ -1430,7 +1430,7 @@ def generate_custom_export_long(
             if c.value == 0:
                 c.value = None
             else:
-                c.number_format = "0.0"
+                c.number_format = "0.00"
     # bold+blue E9–E11, E13–E14, E17, E25,E29,E31,E32,E35
     for coord in ("E9","E10","E11","E13","E14","E17","E25","E29","E31","E32","E35"):
         c = ws[coord]; c.font = bold; c.font = Font(color="FF0000FF", bold=True)
