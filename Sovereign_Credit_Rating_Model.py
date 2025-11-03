@@ -446,14 +446,14 @@ function(params) {
 
 ## Apply column by column configuration in df...
 gb.configure_column("short_name", hide=True)
-gb.configure_column("Factor", valueFormatter=combined_formatter, cellStyle=JsCode("""
+gb.configure_column("Factor", valueFormatter=combined_formatter, maxWidth=320,minWidth=320, cellStyle=JsCode("""
       function(params) {
         return { 'font-weight': 'bold' };
       }
     """)) ## the cell style here makes all the fonts bold..
-gb.configure_column("coefficient", valueFormatter=combined_formatter)
-gb.configure_column("Z-score Value", valueFormatter=combined_formatter)
-gb.configure_column("Rating (notches)", valueFormatter=combined_formatter, cellStyle=JsCode("""
+gb.configure_column("coefficient", valueFormatter=combined_formatter,maxWidth=100,minWidth=100)
+gb.configure_column("Z-score Value", valueFormatter=combined_formatter,maxWidth=120,minWidth=120)
+gb.configure_column("Rating (notches)", valueFormatter=combined_formatter,maxWidth=140,minWidth=140,cellStyle=JsCode("""
       function(params) {
         const id = params.data.short_name;
         if (id === 'predicted_rating' || id === 'final_rating') {
@@ -477,7 +477,7 @@ editable_callback = JsCode("""
 """) ## creating this special object to put into the editable argument for the last 2 col. as dont want people editting header or final score
 
 gb.configure_column("Adjustment", valueFormatter=hide_zero_formatter,editable=editable_callback, filter=False, headerClass="ag-header-cell-label-left",
-                    cellClass="ag-left-aligned-cell",cellStyle=JsCode("""
+                    cellClass="ag-left-aligned-cell",maxWidth=110,minWidth=110,cellStyle=JsCode("""
   function(params) {
     const id = params.data.short_name;
     if (id === 'predicted_rating' || id === 'final_rating') {
@@ -486,7 +486,7 @@ gb.configure_column("Adjustment", valueFormatter=hide_zero_formatter,editable=ed
     return { color: 'blue',  'font-weight': 'normal' };
   }
 """))
-gb.configure_column("Analyst Comment", valueFormatter=hide_na_formatter,editable=editable_callback,maxWidth=488,minWidth=488,
+gb.configure_column("Analyst Comment", valueFormatter=hide_na_formatter,editable=editable_callback,maxWidth=500,minWidth=500,
                     cellStyle=JsCode("""
   function(params) {
     const id = params.data.short_name;
@@ -1214,18 +1214,19 @@ function(params) {
 ## Apply column by column configuration in df...
 
 gb_long.configure_column("short_name", hide=True)
-gb_long.configure_column("Factor", valueFormatter=combined_formatter_long, cellStyle=factor_style_long)
-gb_long.configure_column("Constituent Variables", valueFormatter=combined_formatter_long, cellStyle=purple_description_style)
-gb_long.configure_column("Raw Value", valueFormatter=rawvalue_formatter_long, cellStyle = purple_values_style)
-gb_long.configure_column("Z-score Value", valueFormatter=combined_formatter_long, cellStyle = purple_values_style)
+gb_long.configure_column("Factor", valueFormatter=combined_formatter_long, cellStyle=factor_style_long,maxWidth=320,minWidth=320)
+gb_long.configure_column("Constituent Variables", valueFormatter=combined_formatter_long, cellStyle=purple_description_style,
+                         maxWidth=420,minWidth=420)
+gb_long.configure_column("Raw Value", valueFormatter=rawvalue_formatter_long, cellStyle = purple_values_style,maxWidth=100,minWidth=100)
+gb_long.configure_column("Z-score Value", valueFormatter=combined_formatter_long, cellStyle = purple_values_style,maxWidth=120,minWidth=120)
 
 ## Make adjustment and analyst rationale columns editable
 
 gb_long.configure_column("Adjustment",valueFormatter=hide_zero_formatter_long, cellStyle = adjustment_style,
                          editable = editable_criteria_adjustment, filter=False, headerClass="ag-header-cell-label-left",
-                         cellClass="ag-left-aligned-cell")
+                         cellClass="ag-left-aligned-cell",maxWidth=110,minWidth=110)
 gb_long.configure_column("Analyst Comment",valueFormatter=hide_na_formatter_long, cellStyle = analyst_style, 
-                         editable = editable_criteria_analyst,minWidth=488)
+                         editable = editable_criteria_analyst,maxWidth=500,minWidth=500)
 
 ## Now we apply the color schemes to the grid
 
