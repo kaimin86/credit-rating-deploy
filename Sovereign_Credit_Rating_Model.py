@@ -70,7 +70,7 @@ def load_all_excels():
     return (
         pd.read_excel("transform_data.xlsx"),
         pd.read_excel("raw_data.xlsx"),
-        pd.read_excel("coefficients_apr2024.xlsx"),
+        pd.read_excel("coefficients_2024_WGI_new.xlsx"),
         pd.read_excel("index_rating_scale.xlsx"),
         pd.read_excel("index_variable_name.xlsx"),
         pd.read_excel("index_country.xlsx"),

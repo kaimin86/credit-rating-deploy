@@ -30,12 +30,12 @@ def load_all_excels():
     return (
         pd.read_excel(BASE_DIR/"transform_data.xlsx"),
         pd.read_excel(BASE_DIR/"raw_data.xlsx"),
-        pd.read_excel(BASE_DIR/"coefficients_apr2024.xlsx"),
+        pd.read_excel(BASE_DIR/"coefficients_2024_WGI_new.xlsx"),
         pd.read_excel(BASE_DIR/"index_rating_scale.xlsx"),
         pd.read_excel(BASE_DIR/"index_variable_name.xlsx"),
         pd.read_excel(BASE_DIR/"index_country.xlsx"),
         pd.read_excel(BASE_DIR/"index_bbg_rating_live.xlsx", sheet_name="hard_code"),
-        pd.read_excel(BASE_DIR/"scaler_stats_2024_v2.xlsx")
+        pd.read_excel(BASE_DIR/"scaler_stats_2024_v3.xlsx")
     )
 df_transform, df_raw, coeff_index, rating_index, variable_index, country_index, public_rating_index, scalar_stats = load_all_excels()
 #.. to go up one level in the folder
@@ -237,10 +237,11 @@ override_df_sim = fetch_overrides_sim(selected_name, selected_year)
 
 
 ### Merge overrides into the main df
-long_table_df = pd.merge(long_table_df, override_df_long, on="short_name", how="left")
+long_table_df = pd.merge(long_table_df, override_df_sim, on="short_name", how="left")
 long_table_df["Adjustment"] = pd.to_numeric(long_table_df["Adjustment"], errors="coerce").fillna(0)
 long_table_df["Analyst Comment"] = long_table_df["Analyst Comment"].fillna("")
 
+# coefficient column?
 # custom column for value
 # Z-score impact column
 # implied rating computed below

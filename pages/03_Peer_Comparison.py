@@ -31,7 +31,7 @@ def load_all_excels():
     return (
         pd.read_excel(BASE_DIR/"transform_data.xlsx"),
         pd.read_excel(BASE_DIR/"raw_data.xlsx"),
-        pd.read_excel(BASE_DIR/"coefficients_apr2024.xlsx"),
+        pd.read_excel(BASE_DIR/"coefficients_2024_WGI_new.xlsx"),
         pd.read_excel(BASE_DIR/"index_rating_scale.xlsx"),
         pd.read_excel(BASE_DIR/"index_variable_name.xlsx"),
         pd.read_excel(BASE_DIR/"index_country.xlsx"),
