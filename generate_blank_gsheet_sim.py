@@ -33,9 +33,9 @@ for country in country_list:
         continue
 
     try:
-        sheet.add_worksheet(title=country, rows="1000", cols="4")
+        sheet.add_worksheet(title=country, rows="1000", cols="3")
         ws = sheet.worksheet(country)
-        ws.append_row(["year", "short_name", "Custom Value", "Analyst Comment"])
+        ws.append_row(["year", "short_name", "Custom Value"])
         print(f"✅ Created tab: {country}")
         time.sleep(1.5)  # prevent quota errors
     except gspread.exceptions.APIError as e:
