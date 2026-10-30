@@ -12,7 +12,7 @@ import streamlit as st
 import time
 
 ## set the references year that you want
-choose_year = 2025
+choose_year = 2026
 
 ## get the relevant excel files in. Transform into df and dictionary where relevant
 
